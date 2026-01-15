@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global dark studio vibe */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-brand-bg text-brand-text antialiased font-sans;
+}
+
+a {
+  @apply text-brand-accent underline-offset-4 hover:text-brand-primary;
+}
+
+button {
+  @apply cursor-pointer;
+}
