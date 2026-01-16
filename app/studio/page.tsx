@@ -7,6 +7,8 @@ import TransportBar from "../../components/studio/TransportBar";
 import TrackLane from "../../components/studio/TrackLane";
 import Timeline from "../../components/studio/Timeline";
 
+export const dynamic = "force-dynamic";
+
 export type TrackType = {
   id: string;
   name: string;
