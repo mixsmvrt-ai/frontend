@@ -2,7 +2,6 @@
 
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import TransportBar from "../../components/studio/TransportBar";
 import TrackLane from "../../components/studio/TrackLane";
 import Timeline from "../../components/studio/Timeline";
@@ -116,16 +115,22 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
 }
 
 export default function MixStudio() {
-  const searchParams = useSearchParams();
-  const flowParam = searchParams.get("flow");
-  const studioMode: StudioMode =
-    flowParam === "cleanup" ||
-    flowParam === "mix-only" ||
-    flowParam === "mix-master" ||
-    flowParam === "master-only" ||
-    flowParam === "podcast"
-      ? flowParam
-      : "default";
+  const [studioMode, setStudioMode] = useState<StudioMode>("default");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const flowParam = params.get("flow") as StudioMode | null;
+    if (
+      flowParam === "cleanup" ||
+      flowParam === "mix-only" ||
+      flowParam === "mix-master" ||
+      flowParam === "master-only" ||
+      flowParam === "podcast"
+    ) {
+      setStudioMode(flowParam);
+    }
+  }, []);
 
   const [tracks, setTracks] = useState<TrackType[]>(() =>
     getInitialTracksForMode("default"),
