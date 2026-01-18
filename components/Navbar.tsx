@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { Logo } from "./Logo";
+import { AvatarDropdown } from "./AvatarDropdown";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
 const navItems = [
@@ -17,7 +19,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -28,18 +30,18 @@ export function Navbar() {
       .getSession()
       .then(({ data }) => {
         if (!isMounted) return;
-        setIsLoggedIn(Boolean(data.session));
+        setCurrentUser(data.session?.user ?? null);
       })
       .catch(() => {
         if (!isMounted) return;
-        setIsLoggedIn(false);
+        setCurrentUser(null);
       });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
-      setIsLoggedIn(Boolean(session));
+      setCurrentUser(session?.user ?? null);
     });
 
     return () => {
@@ -52,7 +54,7 @@ export function Navbar() {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       await supabase.auth.signOut();
-      setIsLoggedIn(false);
+      setCurrentUser(null);
       router.push("/");
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -79,22 +81,8 @@ export function Navbar() {
         </div>
 
         <div className="hidden items-center gap-3 text-[13px] sm:flex">
-          {isLoggedIn ? (
-            <>
-              <Link
-                href="/studio"
-                className="rounded-full bg-brand-primary px-4 py-1.5 font-medium text-white shadow-[0_0_25px_rgba(225,6,0,0.85)] transition hover:bg-[#ff291e]"
-              >
-                Open Studio
-              </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-full border border-brand-primary/40 bg-transparent px-4 py-1.5 font-medium text-brand-primary hover:border-brand-primary hover:bg-brand-primary/10"
-              >
-                Log Out
-              </button>
-            </>
+          {currentUser ? (
+            <AvatarDropdown user={currentUser} onLogout={handleLogout} />
           ) : (
             <>
               <Link
@@ -139,7 +127,7 @@ export function Navbar() {
             ))}
           </nav>
           <div className="mt-1 flex gap-2">
-            {isLoggedIn ? (
+            {currentUser ? (
               <>
                 <Link
                   href="/studio"
@@ -152,7 +140,7 @@ export function Navbar() {
                   type="button"
                   onClick={() => {
                     setOpen(false);
-                    handleLogout();
+                    void handleLogout();
                   }}
                   className="flex-1 rounded-full border border-brand-primary/40 bg-transparent px-4 py-1.5 text-center text-[13px] font-medium text-brand-primary hover:border-brand-primary hover:bg-brand-primary/10"
                 >
