@@ -1,6 +1,6 @@
 "use client";
 
-import { ProtectedPage } from "../components/ProtectedPage";
+import { ProtectedPage } from "../../components/ProtectedPage";
 
 const genres = ["Dancehall", "Trap Dancehall", "Afrobeats", "Hip-Hop", "R&B", "Reggae"];
 
