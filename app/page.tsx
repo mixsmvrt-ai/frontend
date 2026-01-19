@@ -38,7 +38,7 @@ function AuthenticatedLanding() {
 
   if (loading) {
     return (
-      <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+      <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         <div className="flex flex-col items-center gap-3 text-center text-sm text-white/70">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
           <p>Loading your workspace&hellip;</p>
@@ -108,7 +108,7 @@ function Hero() {
   return (
     <section className="relative border-b border-white/5 bg-[radial-gradient(circle_at_top,_rgba(225,6,0,0.25),_transparent_60%)]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_55%)]" />
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-12 px-6 py-16 lg:flex-row lg:items-center lg:py-24">
+      <div className="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 py-14 sm:px-6 sm:py-16 lg:flex-row lg:items-center lg:gap-12 lg:py-24">
         <div className="max-w-xl flex-1">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/50 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.22em] text-brand-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
@@ -132,7 +132,7 @@ function Hero() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/signup"
-              className="group inline-flex items-center justify-center rounded-full bg-brand-primary px-7 py-3 text-sm font-semibold text-white shadow-[0_0_40px_rgba(225,6,0,0.9)] transition hover:bg-[#ff291e]"
+              className="group inline-flex items-center justify-center rounded-full bg-brand-primary px-7 py-3 text-sm font-semibold text-white shadow-[0_0_40px_rgba(225,6,0,0.9)] transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#ff291e]"
             >
               Get Started
               <span className="ml-2 inline-block transition group-hover:translate-x-0.5">
@@ -141,7 +141,7 @@ function Hero() {
             </Link>
             <Link
               href="#ab-demo"
-              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-brand-surface/70 px-6 py-3 text-sm font-medium text-brand-text backdrop-blur-md transition hover:border-brand-accent/70 hover:text-brand-accent"
+              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-brand-surface/70 px-6 py-3 text-sm font-medium text-brand-text backdrop-blur-md transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-accent/70 hover:text-brand-accent"
             >
               <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-accent/10 text-[11px] text-brand-accent">
                 ▷
@@ -259,7 +259,7 @@ function WaveformHero() {
 
 function FeatureCard({ title, description }: Feature) {
   return (
-    <div className="group flex flex-col gap-2 rounded-2xl border border-white/5 bg-brand-surfaceMuted/80 p-5 shadow-panel transition hover:border-brand-primary/70 hover:shadow-[0_0_40px_rgba(225,6,0,0.45)]">
+    <div className="group flex flex-col gap-2 rounded-2xl border border-white/5 bg-brand-surfaceMuted/80 p-5 shadow-panel transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-primary/70 hover:shadow-[0_0_40px_rgba(225,6,0,0.45)]">
       <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand-primary/15 text-brand-primary">
         ●
       </div>
@@ -314,7 +314,7 @@ function TierCard({ name, price, description, highlight, features }: Tier) {
   };
   return (
     <div
-      className={`flex h-full flex-col rounded-2xl border bg-brand-surface/80 p-5 text-sm ${
+      className={`flex h-full flex-col rounded-2xl border bg-brand-surface/80 p-5 text-sm transition-colors transition-transform duration-150 hover:-translate-y-0.5 ${
         highlight
           ? "border-brand-primary shadow-[0_0_45px_rgba(225,6,0,0.55)]"
           : "border-white/5"
@@ -337,7 +337,7 @@ function TierCard({ name, price, description, highlight, features }: Tier) {
         <button
           type="button"
           onClick={handleClick}
-          className={`inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium ${
+          className={`inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium transition-colors transition-transform duration-150 hover:-translate-y-0.5 ${
             highlight
               ? "bg-brand-primary text-white hover:bg-[#ff291e]"
               : "border border-white/10 text-brand-text hover:border-brand-accent hover:text-brand-accent"
@@ -356,7 +356,7 @@ export default function Landing() {
 
   if (loading) {
     return (
-      <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+      <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         <div className="flex flex-col items-center gap-3 text-center text-sm text-white/70">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
           <p>Loading your workspace&hellip;</p>
@@ -479,8 +479,8 @@ export default function Landing() {
     <main className="min-h-screen bg-brand-bg text-brand-text">
       <Hero />
 
-      <section id="features" className="border-b border-white/5 bg-brand-surface py-16">
-        <div className="mx-auto max-w-6xl px-6">
+      <section id="features" className="border-b border-white/5 bg-brand-surface py-14 sm:py-16">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <h2 className="text-lg font-semibold text-brand-text sm:text-xl">
@@ -502,9 +502,9 @@ export default function Landing() {
 
       <section
         id="how-it-works"
-        className="border-b border-white/5 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.19),_transparent_60%)] py-16"
+        className="border-b border-white/5 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.19),_transparent_60%)] py-14 sm:py-16"
       >
-        <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 lg:flex-row lg:items-start">
+        <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 sm:px-6 lg:flex-row lg:items-start">
           <div className="flex-1 max-w-md">
             <h2 className="text-lg font-semibold text-brand-text sm:text-xl">
               How MIXSMVRT works
@@ -524,10 +524,10 @@ export default function Landing() {
 
       <section
         id="ab-demo"
-        className="border-b border-white/5 bg-brand-surface py-16"
+        className="border-b border-white/5 bg-brand-surface py-14 sm:py-16"
         aria-label="A/B comparison demo"
       >
-        <div className="mx-auto max-w-6xl px-6">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="grid gap-8 md:grid-cols-[minmax(0,_1.1fr)_minmax(0,_1.2fr)] md:items-center">
             <div>
               <h2 className="text-lg font-semibold text-brand-text sm:text-xl">
@@ -601,7 +601,7 @@ export default function Landing() {
                 </span>
                 <Link
                   href="/studio"
-                  className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-1.5 text-[11px] font-medium text-white hover:bg-[#ff291e]"
+                  className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-1.5 text-[11px] font-medium text-white transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#ff291e]"
                 >
                   Try your own track
                 </Link>
@@ -611,8 +611,11 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="border-b border-white/5 bg-brand-surface py-16" aria-label="Caribbean artist testimonials">
-        <div className="mx-auto max-w-6xl px-6">
+      <section
+        className="border-b border-white/5 bg-brand-surface py-14 sm:py-16"
+        aria-label="Caribbean artist testimonials"
+      >
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-brand-text sm:text-xl">
@@ -634,9 +637,9 @@ export default function Landing() {
 
       <section
         id="presets"
-        className="border-b border-white/5 bg-[radial-gradient(circle_at_top,_rgba(225,6,0,0.22),_transparent_60%)] py-16"
+        className="border-b border-white/5 bg-[radial-gradient(circle_at_top,_rgba(225,6,0,0.22),_transparent_60%)] py-14 sm:py-16"
       >
-        <div className="mx-auto max-w-6xl px-6">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-brand-text sm:text-xl">
@@ -692,10 +695,10 @@ export default function Landing() {
 
       <section
         id="pricing-preview"
-        className="border-b border-white/5 bg-brand-surface py-16"
+        className="border-b border-white/5 bg-brand-surface py-14 sm:py-16"
         aria-label="Pricing preview"
       >
-        <div className="mx-auto max-w-6xl px-6">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-brand-text sm:text-xl">
@@ -708,7 +711,7 @@ export default function Landing() {
             </div>
             <Link
               href="/pricing"
-              className="mt-2 inline-flex items-center justify-center rounded-full border border-white/15 px-4 py-1.5 text-[13px] text-brand-text hover:border-brand-accent hover:text-brand-accent"
+              className="mt-2 inline-flex items-center justify-center rounded-full border border-white/15 px-4 py-1.5 text-[13px] text-brand-text transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-accent hover:text-brand-accent"
             >
               View full pricing
             </Link>
@@ -722,8 +725,8 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="bg-brand-bg py-16">
-        <div className="mx-auto max-w-6xl px-6 text-center">
+      <section className="bg-brand-bg py-14 sm:py-16">
+        <div className="mx-auto max-w-6xl px-4 text-center sm:px-6">
           <h2 className="text-2xl font-semibold tracking-tight text-brand-text sm:text-3xl">
             Mix smarter today.
           </h2>
@@ -734,13 +737,13 @@ export default function Landing() {
           <div className="mt-6 flex flex-wrap justify-center gap-4">
             <Link
               href="/signup"
-              className="inline-flex items-center justify-center rounded-full bg-brand-primary px-7 py-2.5 text-sm font-semibold text-white shadow-[0_0_35px_rgba(225,6,0,0.9)] hover:bg-[#ff291e]"
+              className="inline-flex items-center justify-center rounded-full bg-brand-primary px-7 py-2.5 text-sm font-semibold text-white shadow-[0_0_35px_rgba(225,6,0,0.9)] transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#ff291e]"
             >
               Get started free
             </Link>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-2.5 text-sm font-medium text-brand-text hover:border-brand-accent hover:text-brand-accent"
+              className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-2.5 text-sm font-medium text-brand-text transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-accent hover:text-brand-accent"
             >
               Log in to your account
             </Link>
