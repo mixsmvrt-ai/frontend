@@ -292,7 +292,28 @@ function TestimonialCard({ quote, name, role }: Testimonial) {
   );
 }
 
+import { useRouter } from "next/navigation";
+
+function getPlanSlug(name: string) {
+  switch (name) {
+    case "Starter":
+      return "starter";
+    case "Creator":
+      return "creator";
+    case "Pro":
+      return "pro";
+    default:
+      return "starter";
+  }
+}
+
 function TierCard({ name, price, description, highlight, features }: Tier) {
+  const router = useRouter();
+
+  const handleClick = () => {
+    const slug = getPlanSlug(name);
+    router.push(`/pricing/${slug}`);
+  };
   return (
     <div
       className={`flex h-full flex-col rounded-2xl border bg-brand-surface/80 p-5 text-sm ${
@@ -315,8 +336,9 @@ function TierCard({ name, price, description, highlight, features }: Tier) {
         ))}
       </ul>
       <div className="mt-auto">
-        <Link
-          href="/signup"
+        <button
+          type="button"
+          onClick={handleClick}
           className={`inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium ${
             highlight
               ? "bg-brand-primary text-white hover:bg-[#ff291e]"
@@ -324,7 +346,7 @@ function TierCard({ name, price, description, highlight, features }: Tier) {
           }`}
         >
           Get Started
-        </Link>
+        </button>
       </div>
     </div>
   );
