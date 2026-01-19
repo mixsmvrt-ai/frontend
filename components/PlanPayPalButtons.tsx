@@ -42,6 +42,7 @@ export function PlanPayPalButtons({ planName, amountLabel, onSuccess, onCancel }
         style={{ layout: "vertical", shape: "pill" }}
         createOrder={(_, actions) => {
           return actions.order.create({
+            intent: "CAPTURE",
             purchase_units: [
               {
                 description: `${planName} plan`,
