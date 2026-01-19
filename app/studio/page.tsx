@@ -734,14 +734,20 @@ export default function MixStudio() {
   const isCleanupMode = studioMode === "cleanup";
   const isPodcastMode = studioMode === "podcast";
 
-  const primaryActionLabel = (() => {
-    if (isCleanupMode) return isProcessing ? "Cleaning..." : "Run Cleanup";
-    if (isMixOnlyMode) return isProcessing ? "Mixing..." : "Process Mix";
-    if (isMixMasterMode) return isProcessing ? "Mixing..." : "Run Mix";
-    if (isMasterOnlyMode) return isProcessing ? "Mastering..." : "Run Master";
-    if (isPodcastMode) return isProcessing ? "Processing..." : "Process Session";
-    return isProcessing ? "Processing Mix..." : "Process Full Mix";
-  })();
+  let primaryActionLabel: string;
+  if (isCleanupMode) {
+    primaryActionLabel = isProcessing ? "Cleaning..." : "Run Cleanup";
+  } else if (isMixOnlyMode) {
+    primaryActionLabel = isProcessing ? "Mixing..." : "Process Mix";
+  } else if (isMixMasterMode) {
+    primaryActionLabel = isProcessing ? "Mixing..." : "Run Mix";
+  } else if (isMasterOnlyMode) {
+    primaryActionLabel = isProcessing ? "Mastering..." : "Run Master";
+  } else if (isPodcastMode) {
+    primaryActionLabel = isProcessing ? "Processing..." : "Process Session";
+  } else {
+    primaryActionLabel = isProcessing ? "Processing Mix..." : "Process Full Mix";
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-black text-white sm:h-screen">
@@ -821,6 +827,7 @@ export default function MixStudio() {
         {/* Mobile sticky action bar */}
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-2 sm:hidden">
           <button
+            type="button"
             onClick={addTrack}
             className="inline-flex h-10 items-center justify-center rounded-full border border-white/15 px-3 text-[12px] text-white/80"
           >
@@ -856,32 +863,34 @@ export default function MixStudio() {
 
         {/* Desktop transport + mix controls */}
         <div className="hidden items-center justify-between px-3 py-3 text-xs sm:flex">
-        <button
-          onClick={addTrack}
-          className="rounded bg-red-600 px-4 py-2 text-sm hover:bg-red-700"
-        >
-          + Add Track
-        </button>
-
           <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={addTrack}
+              className="rounded bg-red-600 px-4 py-2 text-sm hover:bg-red-700"
+            >
+              + Add Track
+            </button>
             <div className="flex items-center gap-2">
-             <span className="text-white/60">Master</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={masterVolume}
-              onChange={(e) => setMasterVolume(Number(e.target.value))}
-              className="h-1 w-32 accent-red-500"
-            />
-            <div className="h-6 w-2 overflow-hidden rounded bg-zinc-800">
-              <div
-                className="h-full w-full origin-bottom bg-gradient-to-t from-red-500 via-yellow-400 to-emerald-400 transition-transform"
-                style={{ transform: `scaleY(${masterLevel})` }}
+              <span className="text-white/60">Master</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={masterVolume}
+                onChange={(event) => setMasterVolume(Number(event.target.value))}
+                className="h-1 w-32 accent-red-500"
               />
+              <div className="h-6 w-2 overflow-hidden rounded bg-zinc-800">
+                <div
+                  className="h-full w-full origin-bottom bg-gradient-to-t from-red-500 via-yellow-400 to-emerald-400 transition-transform"
+                  style={{ transform: `scaleY(${masterLevel})` }}
+                />
+              </div>
             </div>
           </div>
+
           <div className="flex items-center gap-4">
             <div className="hidden items-center gap-4 text-[11px] text-white/60 sm:flex">
               <div className="flex items-center gap-2">
@@ -925,6 +934,7 @@ export default function MixStudio() {
 
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={handleProcessSelectedTrack}
                 disabled={
                   isProcessing ||
@@ -939,6 +949,7 @@ export default function MixStudio() {
               {isMixMasterMode && hasMixed ? (
                 <>
                   <button
+                    type="button"
                     onClick={handlePreviewMix}
                     disabled={!tracks.some((track) => track.file)}
                     className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
@@ -946,6 +957,7 @@ export default function MixStudio() {
                     Preview Mix
                   </button>
                   <button
+                    type="button"
                     onClick={handleProcessFullMix}
                     disabled={isProcessing || !tracks.some((track) => track.file)}
                     className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
@@ -953,6 +965,7 @@ export default function MixStudio() {
                     {isProcessing ? "Re-running Mix..." : "Re-run Mix"}
                   </button>
                   <button
+                    type="button"
                     onClick={handleSendToMaster}
                     disabled={
                       isProcessing ||
@@ -964,6 +977,7 @@ export default function MixStudio() {
                     {isMastering ? "Mastering..." : "Send to Master"}
                   </button>
                   <button
+                    type="button"
                     onClick={handleDownloadMixOnly}
                     disabled={!hasMixed || !tracks.some((track) => track.file)}
                     className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
@@ -974,6 +988,7 @@ export default function MixStudio() {
               ) : (
                 <>
                   <button
+                    type="button"
                     onClick={handleProcessFullMix}
                     disabled={isProcessing || !tracks.some((track) => track.file)}
                     className="rounded bg-red-600 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:bg-red-600/50"
@@ -982,6 +997,7 @@ export default function MixStudio() {
                   </button>
                   {(isMasterOnlyMode || isMixOnlyMode || isCleanupMode || isPodcastMode) && hasMixed && (
                     <button
+                      type="button"
                       onClick={handleDownloadMixOnly}
                       disabled={!hasMixed || !tracks.some((track) => track.file)}
                       className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
