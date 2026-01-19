@@ -147,18 +147,6 @@ export default function MixStudio() {
       isMounted = false;
     };
   }, [router]);
-
-  if (authChecking) {
-    return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-black text-sm text-white/70">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
-          <p>Loading your studio&hellip;</p>
-        </div>
-      </div>
-    );
-  }
-
   const [studioMode, setStudioMode] = useState<StudioMode>("default");
 
   useEffect(() => {
@@ -749,7 +737,14 @@ export default function MixStudio() {
     primaryActionLabel = isProcessing ? "Processing Mix..." : "Process Full Mix";
   }
 
-  return (
+  return authChecking ? (
+    <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-black text-sm text-white/70">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
+        <p>Loading your studio&hellip;</p>
+      </div>
+    </div>
+  ) : (
     <div className="flex min-h-screen flex-col bg-black text-white sm:h-screen">
       <TransportBar
         isPlaying={isPlaying}
