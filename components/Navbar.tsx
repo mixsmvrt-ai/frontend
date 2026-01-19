@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { Logo } from "./Logo";
+import { Logo } from "@/components/Logo";
 import { AvatarDropdown } from "./AvatarDropdown";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
