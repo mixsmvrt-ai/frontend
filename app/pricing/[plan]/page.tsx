@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ProtectedPage } from "../../../components/ProtectedPage";
+import { PlanPayPalButtons } from "../../../components/PlanPayPalButtons";
 
 type PlanKey = "starter" | "creator" | "pro";
 
@@ -328,26 +329,12 @@ export default function PlanCheckoutPage({ params }: PlanPageProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Integrate real PayPal checkout here.
-                      closeModal();
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-full bg-[#FFC439] px-4 py-2 text-[13px] font-semibold text-black shadow-[0_0_25px_rgba(250,204,21,0.5)] transition hover:bg-[#ffb400]"
-                  >
-                    <span>Pay with PayPal</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Integrate PayPal card checkout here.
-                      closeModal();
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-black px-4 py-2 text-[13px] font-semibold text-white transition hover:border-brand-accent hover:text-brand-accent"
-                  >
-                    <span>Pay with debit or credit card</span>
-                  </button>
+                  <PlanPayPalButtons
+                    planName={plan.name}
+                    amountLabel={plan.price}
+                    onSuccess={closeModal}
+                    onCancel={closeModal}
+                  />
                 </div>
 
                 <p className="mt-1 text-[10px] text-brand-muted">
