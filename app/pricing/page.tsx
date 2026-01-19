@@ -1,4 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
+import { isSupabaseConfigured, supabase } from "../../lib/supabaseClient";
 
 const tiers = [
   {
@@ -43,7 +49,64 @@ const tiers = [
   },
 ];
 
+type TierName = "Starter" | "Creator" | "Pro";
+
+function getPlanSlug(name: TierName) {
+  switch (name) {
+    case "Starter":
+      return "starter";
+    case "Creator":
+      return "creator";
+    case "Pro":
+      return "pro";
+    default:
+      return "starter";
+  }
+}
+
 export default function PricingPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    let isMounted = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!isMounted) return;
+        setUser(data.session?.user ?? null);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setUser(null);
+      });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleGetStarted = (tierName: TierName) => {
+    const slug = getPlanSlug(tierName);
+
+    if (user) {
+      router.push(`/pricing/${slug}`);
+      return;
+    }
+
+    router.push(`/signup?plan=${slug}`);
+  };
   return (
     <main className="min-h-screen bg-brand-bg text-brand-text">
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6 lg:px-8">
@@ -89,8 +152,9 @@ export default function PricingPage() {
                 ))}
               </ul>
               <div className="mt-auto">
-                <Link
-                  href="/signup"
+                <button
+                  type="button"
+                  onClick={() => handleGetStarted(tier.name as TierName)}
                   className={`inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium ${
                     tier.highlight
                       ? "bg-brand-primary text-white hover:bg-[#ff291e]"
@@ -98,7 +162,7 @@ export default function PricingPage() {
                   }`}
                 >
                   Get Started
-                </Link>
+                </button>
               </div>
             </div>
           ))}
