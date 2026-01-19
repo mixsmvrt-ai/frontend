@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ProtectedPage } from "../../components/ProtectedPage";
+import { ProtectedPage } from "../components/ProtectedPage";
 
 export default function ProfilePage() {
   const [displayName, setDisplayName] = useState("");
