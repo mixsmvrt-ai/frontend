@@ -2,6 +2,8 @@
 
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { isSupabaseConfigured, supabase } from "../../lib/supabaseClient";
 import TransportBar from "../../components/studio/TransportBar";
 import TrackLane from "../../components/studio/TrackLane";
 import Timeline from "../../components/studio/Timeline";
@@ -115,6 +117,48 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
 }
 
 export default function MixStudio() {
+  const router = useRouter();
+  const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!isSupabaseConfigured || !supabase) {
+      router.replace("/login");
+      return undefined;
+    }
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!isMounted) return;
+        if (!data.session) {
+          router.replace("/login");
+          return;
+        }
+        setAuthChecking(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        router.replace("/login");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
+  if (authChecking) {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-black text-sm text-white/70">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
+          <p>Loading your studio&hellip;</p>
+        </div>
+      </div>
+    );
+  }
+
   const [studioMode, setStudioMode] = useState<StudioMode>("default");
 
   useEffect(() => {
