@@ -107,6 +107,7 @@ export default function PricingPage() {
 
     router.push(`/signup?plan=${slug}`);
   };
+
   return (
     <main className="min-h-screen bg-brand-bg text-brand-text">
       <div className="mx-auto max-w-6xl px-4 pb-14 pt-8 sm:px-6 sm:pb-16 sm:pt-10 lg:px-8">
@@ -158,37 +159,37 @@ export default function PricingPage() {
                 <button
                   type="button"
                   onClick={() => handleGetStarted(tier.name as TierName)}
-                  className={`inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium ${
+                  className={`inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium transition-colors transition-transform duration-150 hover:-translate-y-0.5 ${
                     tier.highlight
                       ? "bg-brand-primary text-white hover:bg-[#ff291e]"
                       : "border border-white/15 text-brand-text hover:border-brand-accent hover:text-brand-accent"
                   }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => handleGetStarted(tier.name as TierName)}
-                    className={`inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium transition-colors transition-transform duration-150 hover:-translate-y-0.5 ${
-                      tier.highlight
-                        ? "bg-brand-primary text-white hover:bg-[#ff291e]"
-                        : "border border-white/15 text-brand-text hover:border-brand-accent hover:text-brand-accent"
-                    }`}
-                  >
+                  Get Started
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <section className="mt-10 grid gap-4 text-sm text-brand-muted sm:gap-6 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/5 bg-brand-surface/80 p-5 transition-colors duration-150 hover:border-brand-accent/70">
             <h2 className="text-sm font-semibold text-brand-text">Caribbean‑ready, global‑friendly</h2>
             <p className="mt-2 text-xs">
               MIXSMVRT is tuned for genres where bass, drums, and vocals carry the record:
               dancehall, Afrobeats, trap, reggae, amapiano, and more. Your masters travel well
               from sound system to streaming platform.
             </p>
-          <section className="mt-10 grid gap-4 text-sm text-brand-muted sm:gap-6 md:grid-cols-2">
-            <div className="rounded-2xl border border-white/5 bg-brand-surface/80 p-5 transition-colors duration-150 hover:border-brand-accent/70">
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-brand-surface/80 p-5 transition-colors duration-150 hover:border-brand-accent/70">
             <h2 className="text-sm font-semibold text-brand-text">No long contracts</h2>
             <p className="mt-2 text-xs">
               Upgrade, downgrade, or cancel any time. If you only need MIXSMVRT for a release
-              cycle or tour run, thats cool – well be here when you come back.
+              cycle or tour run, that’s cool – we’ll be here when you come back.
             </p>
           </div>
         </section>
-            <div className="rounded-2xl border border-white/5 bg-brand-surface/80 p-5 transition-colors duration-150 hover:border-brand-accent/70">
+      </div>
     </main>
   );
 }
