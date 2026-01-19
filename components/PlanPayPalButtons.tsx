@@ -46,6 +46,7 @@ export function PlanPayPalButtons({ planName, amountLabel, onSuccess, onCancel }
               {
                 description: `${planName} plan`,
                 amount: {
+                  currency_code: "USD",
                   value: amount,
                 },
               },
