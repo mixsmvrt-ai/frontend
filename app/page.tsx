@@ -292,8 +292,6 @@ function TestimonialCard({ quote, name, role }: Testimonial) {
   );
 }
 
-import { useRouter } from "next/navigation";
-
 function getPlanSlug(name: string) {
   switch (name) {
     case "Starter":
