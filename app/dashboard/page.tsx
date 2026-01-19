@@ -101,7 +101,7 @@ const suggestions: Suggestion[] = [
 export default function Dashboard() {
   return (
     <main className="min-h-screen bg-brand-bg text-brand-text">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pb-10 pt-5 sm:px-6 sm:pb-12 sm:pt-6 lg:px-8">
         <header className="border-b border-white/5 pb-4">
           <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-brand-accent">
             MIXSMVRT Dashboard
@@ -116,12 +116,15 @@ export default function Dashboard() {
           </p>
         </header>
 
-        <section aria-label="Quick actions" className="grid gap-4 md:grid-cols-5">
+        <section
+          aria-label="Quick actions"
+          className="grid gap-3 sm:gap-4 md:grid-cols-5"
+        >
           {quickActions.map((action) => (
             <Link
               key={action.id}
               href={{ pathname: "/studio", query: { flow: action.id } }}
-              className="group flex flex-col justify-between rounded-2xl border border-white/5 bg-brand-surface/80 p-4 text-sm transition hover:border-brand-primary hover:shadow-[0_0_35px_rgba(225,6,0,0.55)]"
+              className="group flex flex-col justify-between rounded-2xl border border-white/5 bg-brand-surface/80 p-4 text-sm transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-primary hover:shadow-[0_0_35px_rgba(225,6,0,0.55)]"
             >
               <div>
                 <div className="mb-2 text-2xl" aria-hidden="true">
@@ -130,7 +133,7 @@ export default function Dashboard() {
                 <h2 className="text-sm font-semibold text-brand-text">{action.label}</h2>
                 <p className="mt-1 text-xs text-brand-muted">{action.description}</p>
               </div>
-              <span className="mt-3 inline-flex items-center text-[11px] text-brand-accent opacity-0 transition group-hover:opacity-100">
+              <span className="mt-3 inline-flex items-center text-[11px] text-brand-accent opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                 Start this flow
                 <span className="ml-1">→</span>
               </span>
@@ -138,8 +141,11 @@ export default function Dashboard() {
           ))}
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,_1.4fr)_minmax(0,_1fr)]">
-          <section aria-label="Recent projects" className="rounded-2xl border border-white/5 bg-brand-surface/80 p-4">
+        <div className="grid gap-6 md:gap-5 lg:grid-cols-[minmax(0,_1.4fr)_minmax(0,_1fr)]">
+          <section
+            aria-label="Recent projects"
+            className="rounded-2xl border border-white/5 bg-brand-surface/80 p-4"
+          >
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-sm font-semibold text-brand-text">Recent projects</h2>
@@ -149,7 +155,7 @@ export default function Dashboard() {
               </div>
               <Link
                 href="/studio"
-                className="inline-flex items-center justify-center rounded-full bg-brand-primary px-3 py-1.5 text-[11px] font-medium text-white hover:bg-[#ff291e]"
+                className="inline-flex items-center justify-center rounded-full bg-brand-primary px-3 py-1.5 text-[11px] font-medium text-white transition-colors duration-150 hover:bg-[#ff291e]"
               >
                 New project
               </Link>
@@ -214,7 +220,7 @@ export default function Dashboard() {
               </p>
               <Link
                 href="/studio"
-                className="mt-3 inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-1.5 text-[11px] font-medium text-white hover:bg-[#ff291e]"
+                className="mt-3 inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-1.5 text-[11px] font-medium text-white transition-colors duration-150 hover:bg-[#ff291e]"
               >
                 Go to MIXSMVRT Studio
               </Link>
