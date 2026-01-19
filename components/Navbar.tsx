@@ -9,10 +9,9 @@ import { AvatarDropdown } from "./AvatarDropdown";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
 const navItems = [
+  { label: "Studio", href: "/studio" },
   { label: "Features", href: "/#features" },
-  { label: "How It Works", href: "/#how-it-works" },
   { label: "Pricing", href: "/pricing" },
-  { label: "Presets", href: "/#presets" },
 ];
 
 export function Navbar() {
@@ -72,7 +71,12 @@ export function Navbar() {
               <Link
                 key={item.label}
                 href={item.href}
-                className="relative inline-flex items-center gap-1 transition-colors hover:text-brand-accent"
+                className={`relative inline-flex items-center gap-1 transition-colors hover:text-brand-accent ${
+                  item.href !== "/#features" &&
+                  (pathname === item.href || pathname.startsWith(`${item.href}/`))
+                    ? "text-white after:absolute after:-bottom-1 after:left-0 after:h-[2px] after:w-full after:bg-red-500 after:shadow-[0_0_12px_rgba(248,113,113,0.9)]"
+                    : ""
+                }`}
               >
                 <span>{item.label}</span>
               </Link>

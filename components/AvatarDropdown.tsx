@@ -147,19 +147,18 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
             <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
               Workspace
             </p>
-            <button
-              ref={firstItemRef}
-              type="button"
-              onClick={handleMenuItemClick(() => {
-                window.location.href = "/studio";
-              })}
+            <Link
+              href="/studio"
+              role="menuitem"
+              onClick={handleMenuItemClick()}
+              ref={firstItemRef as any}
               className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[12px] text-white/90 transition hover:bg-white/5"
             >
               <span>Studio</span>
               <span className="text-[10px] text-white/40">⌘S</span>
-            </button>
+            </Link>
             <Link
-              href="/dashboard"
+              href="/projects"
               role="menuitem"
               onClick={handleMenuItemClick()}
               className="block rounded-lg px-2 py-1.5 text-[12px] text-white/80 transition hover:bg-white/5"
@@ -175,7 +174,7 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
               Presets Library
             </Link>
             <Link
-              href="/upload"
+              href="/upload-history"
               role="menuitem"
               onClick={handleMenuItemClick()}
               className="block rounded-lg px-2 py-1.5 text-[12px] text-white/80 transition hover:bg-white/5"
@@ -206,7 +205,7 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
               Account
             </p>
             <Link
-              href="/account/profile"
+              href="/profile"
               role="menuitem"
               onClick={handleMenuItemClick()}
               className="block rounded-lg px-2 py-1.5 text-[12px] text-white/80 transition hover:bg-white/5"
@@ -214,7 +213,7 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
               Profile
             </Link>
             <Link
-              href="/account/billing"
+              href="/billing"
               role="menuitem"
               onClick={handleMenuItemClick()}
               className="block rounded-lg px-2 py-1.5 text-[12px] text-white/80 transition hover:bg-white/5"
@@ -222,12 +221,20 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
               Billing &amp; Plan
             </Link>
             <Link
-              href="/account/settings"
+              href="/settings"
               role="menuitem"
               onClick={handleMenuItemClick()}
               className="block rounded-lg px-2 py-1.5 text-[12px] text-white/80 transition hover:bg-white/5"
             >
               Settings
+            </Link>
+            <Link
+              href="/support"
+              role="menuitem"
+              onClick={handleMenuItemClick()}
+              className="block rounded-lg px-2 py-1.5 text-[12px] text-white/80 transition hover:bg-white/5"
+            >
+              Support
             </Link>
           </div>
 
