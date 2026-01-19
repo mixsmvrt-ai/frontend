@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { Logo } from "@/components/Logo";
 import { AvatarDropdown } from "./AvatarDropdown";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
@@ -65,7 +64,13 @@ export function Navbar() {
     <header className="sticky top-0 z-40 border-b border-white/5 bg-brand-bg/95 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-6">
-          <Logo />
+          <Link
+            href="/"
+            className="text-sm font-semibold tracking-[0.32em] uppercase text-brand-text/90"
+            aria-label="MIXSMVRT home"
+          >
+            MIXSMVRT
+          </Link>
           <nav className="hidden items-center gap-5 text-[13px] text-brand-muted sm:flex">
             {navItems.map((item) => (
               <Link
