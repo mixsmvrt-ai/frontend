@@ -32,6 +32,8 @@ export function PlanPayPalButtons({ planName, amountLabel, onSuccess, onCancel }
   return (
     <PayPalScriptProvider
       options={{
+        // Some versions of the types expect both keys
+        clientId,
         "client-id": clientId,
         currency: "USD",
       }}
