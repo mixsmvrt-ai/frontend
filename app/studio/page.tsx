@@ -7,6 +7,12 @@ import { isSupabaseConfigured, supabase } from "../../lib/supabaseClient";
 import TransportBar from "../../components/studio/TransportBar";
 import TrackLane from "../../components/studio/TrackLane";
 import Timeline from "../../components/studio/Timeline";
+import {
+  ProcessingOverlay,
+  type ProcessingOverlayState,
+  type TrackProcessingStatus,
+  PROCESSING_STAGES,
+} from "../../components/studio/ProcessingOverlay";
 
 export const dynamic = "force-dynamic";
 
@@ -185,6 +191,8 @@ export default function MixStudio() {
   const [referenceProfile, setReferenceProfile] = useState<any | null>(null);
   const [referenceAnalysis, setReferenceAnalysis] = useState<any | null>(null);
   const [isAnalyzingReference, setIsAnalyzingReference] = useState(false);
+  const [processingOverlay, setProcessingOverlay] =
+    useState<ProcessingOverlayState | null>(null);
 
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
@@ -525,18 +533,93 @@ export default function MixStudio() {
     setIsProcessing(true);
     setHasMixed(false);
 
+    const playable = tracks.filter((track) => track.file);
+    const initialTrackStatuses: TrackProcessingStatus[] = playable.map((track) => ({
+      id: track.id,
+      name: track.name || track.id,
+      state: "idle",
+      percentage: 0,
+    }));
+
+    setProcessingOverlay({
+      active: true,
+      mode: "mix",
+      percentage: 0,
+      currentStageId: "analyze",
+      completedStageIds: [],
+      tracks: initialTrackStatuses,
+      error: null,
+    });
+
     try {
       const updates = new Map<string, File>();
       let anyUpdated = false;
 
       // Process each track that has audio through the AI DSP service
-      for (const track of tracks) {
-        if (!track.file) continue;
+      for (let index = 0; index < playable.length; index += 1) {
+        const track = playable[index];
+        const progressForTrack = (index / playable.length) * 100;
+
+        setProcessingOverlay((prev) => {
+          if (!prev) return prev;
+          const updatedTracks = prev.tracks.map((t) => {
+            if (t.id === track.id) {
+              return { ...t, state: "processing", percentage: progressForTrack };
+            }
+            return t;
+          });
+
+          const stageIndex = Math.min(
+            PROCESSING_STAGES.length - 1,
+            Math.floor((progressForTrack / 100) * PROCESSING_STAGES.length),
+          );
+          const currentStage = PROCESSING_STAGES[stageIndex];
+          const completedStageIds = PROCESSING_STAGES.slice(0, stageIndex).map(
+            (s) => s.id,
+          );
+
+          return {
+            ...prev,
+            percentage: progressForTrack,
+            currentStageId: currentStage.id,
+            completedStageIds,
+            tracks: updatedTracks,
+          };
+        });
+
         // eslint-disable-next-line no-await-in-loop
         const processed = await processTrackWithAI(track);
         if (processed) {
           updates.set(track.id, processed);
           anyUpdated = true;
+
+          const completedPercent = ((index + 1) / playable.length) * 100;
+          setProcessingOverlay((prev) => {
+            if (!prev) return prev;
+            const updatedTracks = prev.tracks.map((t) => {
+              if (t.id === track.id) {
+                return { ...t, state: "completed", percentage: completedPercent };
+              }
+              return t;
+            });
+
+            const stageIndex = Math.min(
+              PROCESSING_STAGES.length - 1,
+              Math.floor((completedPercent / 100) * PROCESSING_STAGES.length),
+            );
+            const currentStage = PROCESSING_STAGES[stageIndex];
+            const completedStageIds = PROCESSING_STAGES.slice(0, stageIndex + 1).map(
+              (s) => s.id,
+            );
+
+            return {
+              ...prev,
+              percentage: completedPercent,
+              currentStageId: currentStage.id,
+              completedStageIds,
+              tracks: updatedTracks,
+            };
+          });
         }
       }
 
@@ -556,8 +639,32 @@ export default function MixStudio() {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Error processing mix with AI", error);
+      setProcessingOverlay((prev) =>
+        prev
+          ? {
+              ...prev,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Something went wrong while processing this mix.",
+            }
+          : prev,
+      );
     } finally {
       setIsProcessing(false);
+      setProcessingOverlay((prev) =>
+        prev
+          ? {
+              ...prev,
+              active: false,
+              percentage: prev.error ? prev.percentage : 100,
+              currentStageId: prev.error ? prev.currentStageId : "finalize",
+              completedStageIds: prev.error
+                ? prev.completedStageIds
+                : PROCESSING_STAGES.map((s) => s.id),
+            }
+          : prev,
+      );
     }
   };
 
@@ -567,6 +674,23 @@ export default function MixStudio() {
 
     const target = tracks.find((track) => track.id === selectedTrackId);
     if (!target || !target.file) return;
+
+    const trackStatus: TrackProcessingStatus = {
+      id: target.id,
+      name: target.name || target.id,
+      state: "processing",
+      percentage: 0,
+    };
+
+    setProcessingOverlay({
+      active: true,
+      mode: "track",
+      percentage: 0,
+      currentStageId: "analyze",
+      completedStageIds: [],
+      tracks: [trackStatus],
+      error: null,
+    });
 
     setIsProcessing(true);
     try {
@@ -586,8 +710,32 @@ export default function MixStudio() {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Error processing selected track with AI", error);
+      setProcessingOverlay((prev) =>
+        prev
+          ? {
+              ...prev,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Something went wrong while processing this track.",
+            }
+          : prev,
+      );
     } finally {
       setIsProcessing(false);
+      setProcessingOverlay((prev) =>
+        prev
+          ? {
+              ...prev,
+              active: false,
+              percentage: prev.error ? prev.percentage : 100,
+              currentStageId: prev.error ? prev.currentStageId : "finalize",
+              completedStageIds: prev.error
+                ? prev.completedStageIds
+                : PROCESSING_STAGES.map((s) => s.id),
+            }
+          : prev,
+      );
     }
   };
 
@@ -746,6 +894,8 @@ export default function MixStudio() {
     </div>
   ) : (
     <div className="flex min-h-screen flex-col bg-black text-white sm:h-screen">
+      <ProcessingOverlay state={processingOverlay} />
+
       <TransportBar
         isPlaying={isPlaying}
         onPlayToggle={() => setIsPlaying((p) => !p)}
