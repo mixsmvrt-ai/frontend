@@ -744,7 +744,7 @@ export default function MixStudio() {
   })();
 
   return (
-    <div className="flex h-screen flex-col bg-black text-white">
+    <div className="flex min-h-screen flex-col bg-black text-white sm:h-screen">
       <TransportBar
         isPlaying={isPlaying}
         onPlayToggle={() => setIsPlaying((p) => !p)}
@@ -762,58 +762,100 @@ export default function MixStudio() {
         onSessionScaleChange={setSessionScale}
       />
 
-      <div className="flex-1 overflow-auto">
-        <Timeline zoom={zoom} gridResolution={gridResolution} bpm={bpm} />
+      <div className="flex-1 overflow-y-auto bg-black pb-20 sm:pb-0">
+        <div className="w-full overflow-x-auto">
+          <div className="min-w-[900px]">
+            <Timeline zoom={zoom} gridResolution={gridResolution} bpm={bpm} />
 
-        <div>
-          {tracks.map((track) => (
-            <TrackLane
-              key={track.id}
-              track={track}
-              zoom={zoom}
-              isPlaying={isPlaying}
-              masterVolume={masterVolume}
-              onFileSelected={handleFileSelected}
-              onVolumeChange={handleVolumeChange}
-              onPanChange={handlePanChange}
-              onLevelChange={handleTrackLevelChange}
-              onGenderChange={handleTrackGenderChange}
-              isSelected={selectedTrackId === track.id}
-              onSelect={handleSelectTrack}
-              onDelete={handleDeleteTrack}
-              onDuplicate={handleDuplicateTrack}
-              onProcess={async (trackId) => {
-                const current = tracks.find((t) => t.id === trackId);
-                if (!current || !current.file || isProcessing) return;
-                setSelectedTrackId(trackId);
-                setIsProcessing(true);
-                try {
-                  const processed = await processTrackWithAI(current);
-                  if (processed) {
-                    setTracks((prev) =>
-                      prev.map((t) =>
-                        t.id === trackId
-                          ? {
-                              ...t,
-                              file: processed,
-                            }
-                          : t,
-                      ),
-                    );
-                  }
-                } catch (error) {
-                  // eslint-disable-next-line no-console
-                  console.error("Error processing track from context menu", error);
-                } finally {
-                  setIsProcessing(false);
-                }
-              }}
-            />
-          ))}
+            <div>
+              {tracks.map((track) => (
+                <TrackLane
+                  key={track.id}
+                  track={track}
+                  zoom={zoom}
+                  isPlaying={isPlaying}
+                  masterVolume={masterVolume}
+                  onFileSelected={handleFileSelected}
+                  onVolumeChange={handleVolumeChange}
+                  onPanChange={handlePanChange}
+                  onLevelChange={handleTrackLevelChange}
+                  onGenderChange={handleTrackGenderChange}
+                  isSelected={selectedTrackId === track.id}
+                  onSelect={handleSelectTrack}
+                  onDelete={handleDeleteTrack}
+                  onDuplicate={handleDuplicateTrack}
+                  onProcess={async (trackId) => {
+                    const current = tracks.find((t) => t.id === trackId);
+                    if (!current || !current.file || isProcessing) return;
+                    setSelectedTrackId(trackId);
+                    setIsProcessing(true);
+                    try {
+                      const processed = await processTrackWithAI(current);
+                      if (processed) {
+                        setTracks((prev) =>
+                          prev.map((t) =>
+                            t.id === trackId
+                              ? {
+                                  ...t,
+                                  file: processed,
+                                }
+                              : t,
+                          ),
+                        );
+                      }
+                    } catch (error) {
+                      // eslint-disable-next-line no-console
+                      console.error("Error processing track from context menu", error);
+                    } finally {
+                      setIsProcessing(false);
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-white/10 p-3 text-xs">
+      <div className="border-t border-white/10 bg-black/95 text-xs sm:bg-transparent">
+        {/* Mobile sticky action bar */}
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-2 sm:hidden">
+          <button
+            onClick={addTrack}
+            className="inline-flex h-10 items-center justify-center rounded-full border border-white/15 px-3 text-[12px] text-white/80"
+          >
+            + Track
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsPlaying((p) => !p)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[13px] font-semibold text-black"
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? "❚❚" : "▶"}
+            </button>
+            <button
+              type="button"
+              onClick={handlePreviewMix}
+              disabled={!tracks.some((track) => track.file)}
+              className="inline-flex h-10 items-center justify-center rounded-full border border-white/20 px-3 text-[12px] text-white/80 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/40"
+            >
+              A/B
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleProcessFullMix}
+            disabled={isProcessing || !tracks.some((track) => track.file)}
+            className="inline-flex h-10 flex-1 items-center justify-center rounded-full bg-red-600 text-[12px] font-semibold text-white shadow-[0_0_20px_rgba(225,6,0,0.8)] disabled:cursor-not-allowed disabled:bg-red-600/50"
+          >
+            {primaryActionLabel}
+          </button>
+        </div>
+
+        {/* Desktop transport + mix controls */}
+        <div className="hidden items-center justify-between px-3 py-3 text-xs sm:flex">
         <button
           onClick={addTrack}
           className="rounded bg-red-600 px-4 py-2 text-sm hover:bg-red-700"
