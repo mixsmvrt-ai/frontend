@@ -60,7 +60,7 @@ export function ProtectedPage({ title, subtitle, children }: ProtectedPageProps)
 
   if (loading || !user) {
     return (
-      <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+      <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         <div className="flex flex-col items-center gap-3 text-center text-sm text-white/70">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
           <p>Loading your workspace&hellip;</p>
@@ -70,10 +70,10 @@ export function ProtectedPage({ title, subtitle, children }: ProtectedPageProps)
   }
 
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6 flex flex-col gap-2 border-b border-white/5 pb-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
+    <main className="mx-auto flex min-h-[60vh] max-w-6xl flex-col px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <header className="mb-5 flex flex-col gap-2 border-b border-white/5 pb-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+          <h1 className="text-lg font-semibold tracking-tight text-white sm:text-2xl">
             {title}
           </h1>
           {subtitle && (
@@ -81,7 +81,9 @@ export function ProtectedPage({ title, subtitle, children }: ProtectedPageProps)
           )}
         </div>
       </header>
-      <section className="flex-1 pb-8">{children}</section>
+      <section className="flex-1 pb-8">
+        <div className="grid gap-4 sm:gap-6 lg:gap-8">{children}</div>
+      </section>
     </main>
   );
 }
