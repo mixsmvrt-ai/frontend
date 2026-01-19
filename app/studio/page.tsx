@@ -560,11 +560,15 @@ export default function MixStudio() {
         const track = playable[index];
         const progressForTrack = (index / playable.length) * 100;
 
-        setProcessingOverlay((prev) => {
+        setProcessingOverlay((prev): ProcessingOverlayState | null => {
           if (!prev) return prev;
-          const updatedTracks = prev.tracks.map((t) => {
+          const updatedTracks: TrackProcessingStatus[] = prev.tracks.map((t) => {
             if (t.id === track.id) {
-              return { ...t, state: "processing", percentage: progressForTrack };
+              return {
+                ...t,
+                state: "processing" as TrackProcessingStatus["state"],
+                percentage: progressForTrack,
+              };
             }
             return t;
           });
@@ -594,11 +598,15 @@ export default function MixStudio() {
           anyUpdated = true;
 
           const completedPercent = ((index + 1) / playable.length) * 100;
-          setProcessingOverlay((prev) => {
+          setProcessingOverlay((prev): ProcessingOverlayState | null => {
             if (!prev) return prev;
-            const updatedTracks = prev.tracks.map((t) => {
+            const updatedTracks: TrackProcessingStatus[] = prev.tracks.map((t) => {
               if (t.id === track.id) {
-                return { ...t, state: "completed", percentage: completedPercent };
+                return {
+                  ...t,
+                  state: "completed" as TrackProcessingStatus["state"],
+                  percentage: completedPercent,
+                };
               }
               return t;
             });
