@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AvatarDropdown } from "./AvatarDropdown";
+import { MobileHamburgerMenu } from "./MobileHamburgerMenu";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
 const navItems = [
@@ -72,6 +73,12 @@ export function Navbar() {
       console.error("Error signing out", error);
     }
   };
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    if (!open) return;
+    setOpen(false);
+  }, [pathname, open]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-brand-bg/95 backdrop-blur-xl">
@@ -141,114 +148,17 @@ export function Navbar() {
         </div>
       </div>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm sm:hidden"
-          aria-modal="true"
-          role="dialog"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="absolute inset-x-0 bottom-0 max-h-[80vh] rounded-t-3xl border-t border-white/10 bg-brand-bg/98 pb-4 shadow-[0_-20px_60px_rgba(0,0,0,0.85)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/15" aria-hidden="true" />
-            {currentUser && (
-              <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-red-600 via-red-500 to-amber-400 text-[13px] font-semibold text-white shadow-[0_0_18px_rgba(248,113,113,0.7)]">
-                  <span>{initials}</span>
-                </div>
-                <div className="min-w-0 flex-1 text-xs">
-                  <p className="truncate text-sm font-medium text-white">{displayName}</p>
-                  <p className="truncate text-[11px] text-white/60">{email}</p>
-                  <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-red-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
-                    <span>{planLabel} Plan</span>
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <nav className="mx-auto mt-1 flex max-w-6xl flex-col gap-1 px-4 py-2 text-sm text-brand-muted">
-              <Link
-                href="/studio"
-                className="flex items-center justify-between rounded-2xl bg-brand-surface px-3 py-3 text-[14px] text-white"
-                onClick={() => setOpen(false)}
-              >
-                <span>Studio</span>
-                <span className="text-[11px] text-white/50">Open workspace</span>
-              </Link>
-              <Link
-                href="/projects"
-                className="rounded-2xl px-3 py-3 text-[14px] text-white/90 hover:bg-brand-surface"
-                onClick={() => setOpen(false)}
-              >
-                Projects
-              </Link>
-              <Link
-                href="/presets"
-                className="rounded-2xl px-3 py-3 text-[14px] text-white/90 hover:bg-brand-surface"
-                onClick={() => setOpen(false)}
-              >
-                Presets
-              </Link>
-              <Link
-                href="/billing"
-                className="rounded-2xl px-3 py-3 text-[14px] text-white/90 hover:bg-brand-surface"
-                onClick={() => setOpen(false)}
-              >
-                Billing &amp; Plan
-              </Link>
-              <Link
-                href="/settings"
-                className="rounded-2xl px-3 py-3 text-[14px] text-white/90 hover:bg-brand-surface"
-                onClick={() => setOpen(false)}
-              >
-                Settings
-              </Link>
-              <Link
-                href="/support"
-                className="rounded-2xl px-3 py-3 text-[14px] text-white/90 hover:bg-brand-surface"
-                onClick={() => setOpen(false)}
-              >
-                Support
-              </Link>
-            </nav>
-
-            <div className="mx-auto mt-2 flex max-w-6xl flex-col gap-2 px-4 text-[13px]">
-              {currentUser ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    void handleLogout();
-                  }}
-                  className="mt-1 inline-flex h-11 w-full items-center justify-center rounded-full bg-red-600 text-[13px] font-medium text-white shadow-[0_0_24px_rgba(225,6,0,0.9)] transition hover:bg-[#ff291e]"
-                >
-                  Log out
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <Link
-                    href="/login"
-                    className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-brand-primary/40 bg-transparent text-[13px] font-medium text-brand-primary hover:border-brand-primary hover:bg-brand-primary/10"
-                    onClick={() => setOpen(false)}
-                  >
-                    Log In
-                  </Link>
-                  <Link
-                    href="/signup"
-                    className="inline-flex h-11 flex-1 items-center justify-center rounded-full bg-brand-primary text-[13px] font-medium text-white shadow-[0_0_25px_rgba(225,6,0,0.85)] transition hover:bg-[#ff291e]"
-                    onClick={() => setOpen(false)}
-                  >
-                    Get Started
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <MobileHamburgerMenu
+        open={open}
+        onClose={() => setOpen(false)}
+        user={currentUser}
+        email={email}
+        displayName={displayName}
+        initials={initials}
+        planLabel={planLabel}
+        pathname={pathname}
+        onLogout={handleLogout}
+      />
     </header>
   );
 }
