@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Navbar } from "../components/Navbar";
 import { GlobalBackButton } from "../components/GlobalBackButton";
+import { Footer } from "../components/Footer";
 
 export const metadata = {
   title: "MIXSMVRT · AI-Powered Mixing & Mastering",
@@ -19,6 +20,7 @@ export default function RootLayout({
           <Navbar />
           <GlobalBackButton />
           <div className="flex-1">{children}</div>
+          <Footer />
         </div>
       </body>
     </html>
