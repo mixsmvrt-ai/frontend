@@ -4,10 +4,7 @@
 // Route: / (app/page.tsx)
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { User } from "@supabase/supabase-js";
-import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
 type Feature = {
   title: string;
@@ -32,77 +29,6 @@ type Tier = {
   highlight?: boolean;
   features: string[];
 };
-
-function AuthenticatedLanding() {
-  const { loading } = useRequireAuth();
-
-  if (loading) {
-    return (
-      <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-        <div className="flex flex-col items-center gap-3 text-center text-sm text-white/70">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
-          <p>Loading your workspace&hellip;</p>
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <>
-      <Hero />
-      {/* The rest of the landing sections remain unchanged */}
-    </>
-  );
-}
-
-function useRequireAuth() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!isSupabaseConfigured || !supabase) {
-      router.replace("/login");
-      return undefined;
-    }
-
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!isMounted) return;
-        if (!data.session) {
-          router.replace("/login");
-          return;
-        }
-        setUser(data.session.user);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        router.replace("/login");
-      });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isMounted) return;
-      if (!session) {
-        router.replace("/login");
-      } else {
-        setUser(session.user);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, [router]);
-
-  return { user, loading };
-}
 
 function Hero() {
   return (
@@ -350,20 +276,8 @@ function TierCard({ name, price, description, highlight, features }: Tier) {
   );
 }
 
-// Landing page root (protected)
+// Public landing page root
 export default function Landing() {
-  const { loading } = useRequireAuth();
-
-  if (loading) {
-    return (
-      <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-        <div className="flex flex-col items-center gap-3 text-center text-sm text-white/70">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
-          <p>Loading your workspace&hellip;</p>
-        </div>
-      </main>
-    );
-  }
   const features: Feature[] = [
     {
       title: "AI mixing – per-track & full mix",
