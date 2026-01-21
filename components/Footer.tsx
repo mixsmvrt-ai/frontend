@@ -46,7 +46,7 @@ export function Footer() {
             •
           </span>
           <a
-            href="/refund-policy"
+            href="/refund"
             className="text-white/60 underline-offset-2 hover:text-white focus:outline-none focus-visible:text-white focus-visible:underline"
           >
             Refund Policy
