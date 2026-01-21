@@ -36,8 +36,15 @@ export default function LoginPage() {
         setIsSubmitting(false);
         return;
       }
+      const adminEmailRaw = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "mixsmvrt@gmail.com";
+      const adminEmail = adminEmailRaw.trim().toLowerCase();
+      const emailNormalized = email.toLowerCase();
 
-      router.push("/dashboard");
+      if (emailNormalized === adminEmail) {
+        router.push("/admin");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err) {
       console.error(err);
       setError("Unexpected error while logging in. Please try again.");
