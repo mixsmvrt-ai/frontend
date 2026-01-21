@@ -6,8 +6,8 @@ export function GlobalBackButton() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Hide on landing page
-  if (!pathname || pathname === "/") {
+  // Hide on landing page and studio page
+  if (!pathname || pathname === "/" || pathname.startsWith("/studio")) {
     return null;
   }
 
