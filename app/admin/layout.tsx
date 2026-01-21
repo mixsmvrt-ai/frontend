@@ -27,8 +27,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       const user = data.user;
       const role = (user?.user_metadata as any)?.role ?? (user?.app_metadata as any)?.role;
 
-      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "mixsmvrt@gmail.com";
-      const isAdminByEmail = Boolean(user && user.email === adminEmail);
+      const adminEmailRaw = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "mixsmvrt@gmail.com";
+      const adminEmail = adminEmailRaw.trim().toLowerCase();
+      const userEmail = (user?.email ?? "").trim().toLowerCase();
+      const isAdminByEmail = Boolean(userEmail && userEmail === adminEmail);
       const isAdminByRole = Boolean(user && role === "admin");
       const isAdmin = isAdminByEmail || isAdminByRole;
 
