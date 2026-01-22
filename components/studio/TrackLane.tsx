@@ -207,38 +207,30 @@ export default function TrackLane({
         typeof (ac as any).createStereoPanner === "function"
           ? (ac as any).createStereoPanner()
           : null;
-      const analyser = ac.createAnalyser();
-      analyser.fftSize = 2048;
 
-      // Prefer WaveSurfer's filter chain if available, inserting a stereo
-      // panner before the analyser so pan affects playback.
+      // Prefer WaveSurfer's internal analyser if it exists so we are
+      // guaranteed to be tapping into the actual playback signal.
+      const existingAnalyser: AnalyserNode | undefined = (backend as any).analyser;
+      const analyser: AnalyserNode = existingAnalyser ?? ac.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.8;
+
       if (typeof backend.setFilters === "function") {
+        const filters: AudioNode[] = [];
         if (panner) {
           panner.pan.value = track.pan ?? 0;
-          backend.setFilters([panner, analyser]);
+          filters.push(panner);
           pannerRef.current = panner;
         } else {
-          backend.setFilters([analyser]);
           pannerRef.current = null;
         }
-      }
-
-      // Also tap directly from the source so the analyser always sees audio
-      const source: AudioNode | undefined =
-        (backend as any).source || (backend as any).bufferSource;
-      if (source && typeof (source as any).connect === "function") {
-        try {
-          // Connect source → analyser without routing analyser to destination,
-          // so we only "listen" for metering and don't affect playback.
-          (source as any).connect(analyser);
-        } catch {
-          // If the extra tap fails, we still have the filter-chain path.
-        }
+        filters.push(analyser);
+        backend.setFilters(filters);
       }
 
       analyserRef.current = analyser;
 
-      const buffer = new Uint8Array(analyser.frequencyBinCount);
+      const buffer = new Uint8Array(analyser.frequencyBinCount || 2048);
 
       const loop = () => {
         if (!analyserRef.current) return;
