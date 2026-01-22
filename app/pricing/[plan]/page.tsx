@@ -154,22 +154,15 @@ export default function PlanCheckoutPage({ params }: PlanPageProps) {
             <button
               type="button"
               onClick={() => openCheckout("paypal")}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-[#FFC439] px-4 py-2 text-[13px] font-semibold text-black shadow-[0_0_25px_rgba(250,204,21,0.5)] transition hover:bg-[#ffb400]"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-brand-primary px-4 py-2 text-[13px] font-semibold text-black shadow-[0_0_25px_rgba(248,113,113,0.5)] transition hover:bg-brand-accent"
             >
-              <span>Pay with PayPal</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openCheckout("card")}
-              className="flex w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-black px-4 py-2 text-[13px] font-semibold text-white transition hover:border-brand-accent hover:text-brand-accent"
-            >
-              <span>Pay with debit or credit card</span>
+              <span>Pay now</span>
             </button>
           </div>
 
           <p className="mt-2 text-[11px] text-brand-muted">
-            You&apos;ll confirm your details in a quick two-step flow before completing
-            payment with PayPal.
+            You&apos;ll confirm your details in a quick two-step flow. On the final step
+            you can choose PayPal or card and complete payment.
           </p>
         </aside>
       </div>
