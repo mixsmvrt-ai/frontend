@@ -271,7 +271,7 @@ export default function TrackLane({
       wavesurferRef.current = null;
       URL.revokeObjectURL(objectUrl);
     };
-  }, [track.file, track.volume, masterVolume, zoom, onLevelChange, track.id]);
+  }, [track.file, zoom, onLevelChange, track.id]);
 
   // React to zoom changes
   useEffect(() => {
