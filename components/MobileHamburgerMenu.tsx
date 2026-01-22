@@ -193,10 +193,29 @@ export function MobileHamburgerMenu({
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
           <Link
             href="/"
-            className="text-[11px] font-semibold uppercase tracking-[0.32em] text-white/80"
+            className="group inline-flex items-center gap-2 font-display text-[11px] font-semibold tracking-[0.32em] text-white/80 uppercase"
             onClick={onClose}
+            aria-label="MIXSMVRT home"
           >
-            MIXSMVRT
+            <span className="relative inline-flex items-center gap-1">
+              <span className="text-white/70 group-hover:text-white transition-colors">MIX</span>
+              <span className="relative text-red-500 group-hover:text-red-400 transition-colors">
+                SMVRT
+                <span className="pointer-events-none absolute -bottom-1 left-0 flex h-[6px] w-full items-end justify-between opacity-70 group-hover:opacity-100 group-hover:shadow-[0_0_16px_rgba(225,6,0,0.8)] transition-all">
+                  {Array.from({ length: 6 }).map((_, index) => {
+                    const heights = [4, 7, 10, 7, 5, 8];
+                    return (
+                      // eslint-disable-next-line react/no-array-index-key
+                      <span
+                        key={index}
+                        className="w-[3px] rounded-t-full bg-gradient-to-t from-red-600/70 via-red-400/80 to-white/80"
+                        style={{ height: heights[index] }}
+                      />
+                    );
+                  })}
+                </span>
+              </span>
+            </span>
           </Link>
           <button
             type="button"

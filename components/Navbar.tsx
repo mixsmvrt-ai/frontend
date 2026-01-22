@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AvatarDropdown } from "./AvatarDropdown";
 import { MobileHamburgerMenu } from "./MobileHamburgerMenu";
+import { Logo } from "./Logo";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
 const navItems = [
@@ -84,13 +84,7 @@ export function Navbar() {
     <header className="sticky top-0 z-40 border-b border-white/5 bg-brand-bg/95 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-2.5 sm:gap-4 sm:px-6 sm:py-3 lg:px-8">
         <div className="flex flex-1 items-center gap-3 sm:flex-none sm:gap-6">
-          <Link
-            href="/"
-            className="text-[11px] font-semibold tracking-[0.32em] uppercase text-brand-text/90 sm:text-sm"
-            aria-label="MIXSMVRT home"
-          >
-            MIXSMVRT
-          </Link>
+          <Logo />
           <nav className="hidden items-center gap-5 text-[13px] text-brand-muted sm:flex">
             {navItems.map((item) => (
               <Link

@@ -1,3 +1,5 @@
+import { Logo } from "./Logo";
+
 export function Footer() {
   const year = new Date().getFullYear();
 
@@ -6,9 +8,7 @@ export function Footer() {
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2 gap-x-4 px-4 py-3 sm:px-6 lg:px-8">
         {/* Left: logo + tagline */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] sm:text-xs">
-          <span className="font-semibold tracking-[0.22em] uppercase text-white/80">
-            MIXSMVRT
-          </span>
+          <Logo />
           <span className="hidden h-3 w-px bg-white/15 sm:inline" aria-hidden="true" />
           <span className="text-white/50">Mix &amp; Master with AI</span>
         </div>
