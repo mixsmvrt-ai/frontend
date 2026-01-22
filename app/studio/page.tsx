@@ -975,67 +975,66 @@ export default function MixStudio() {
 
       <div className="flex-1 overflow-y-auto overflow-x-auto bg-black pb-20 sm:pb-0">
         <div className="min-w-[900px]">
-            <Timeline
-              zoom={zoom}
-              gridResolution={gridResolution}
-              bpm={bpm}
-              onZoomChange={(value) =>
-                setZoom((prev) => {
-                  const clamped = Math.min(6, Math.max(0.5, value));
-                  return Number.isFinite(clamped) ? clamped : prev;
-                })
-              }
-            />
+          <Timeline
+            zoom={zoom}
+            gridResolution={gridResolution}
+            bpm={bpm}
+            onZoomChange={(value) =>
+              setZoom((prev) => {
+                const clamped = Math.min(6, Math.max(0.5, value));
+                return Number.isFinite(clamped) ? clamped : prev;
+              })
+            }
+          />
 
-            <div>
-              {tracks.map((track) => (
-                <TrackLane
-                  key={track.id}
-                  track={track}
-                  zoom={zoom}
-                  isPlaying={isPlaying}
-                  masterVolume={masterVolume}
-                  onFileSelected={handleFileSelected}
-                  onVolumeChange={handleVolumeChange}
-                  onPanChange={handlePanChange}
-                  onLevelChange={handleTrackLevelChange}
-                  onGenderChange={handleTrackGenderChange}
-                  onToggleMute={handleToggleMute}
-                  onToggleSolo={handleToggleSolo}
-                  isAnySoloActive={isAnySoloActive}
-                  isSelected={selectedTrackId === track.id}
-                  onSelect={handleSelectTrack}
-                  onDelete={handleDeleteTrack}
-                  onDuplicate={handleDuplicateTrack}
-                  onProcess={async (trackId) => {
-                    const current = tracks.find((t) => t.id === trackId);
-                    if (!current || !current.file || isProcessing) return;
-                    setSelectedTrackId(trackId);
-                    setIsProcessing(true);
-                    try {
-                      const processed = await processTrackWithAI(current);
-                      if (processed) {
-                        setTracks((prev) =>
-                          prev.map((t) =>
-                            t.id === trackId
-                              ? {
-                                  ...t,
-                                  file: processed,
-                                }
-                              : t,
-                          ),
-                        );
-                      }
-                    } catch (error) {
-                      // eslint-disable-next-line no-console
-                      console.error("Error processing track from context menu", error);
-                    } finally {
-                      setIsProcessing(false);
+          <div>
+            {tracks.map((track) => (
+              <TrackLane
+                key={track.id}
+                track={track}
+                zoom={zoom}
+                isPlaying={isPlaying}
+                masterVolume={masterVolume}
+                onFileSelected={handleFileSelected}
+                onVolumeChange={handleVolumeChange}
+                onPanChange={handlePanChange}
+                onLevelChange={handleTrackLevelChange}
+                onGenderChange={handleTrackGenderChange}
+                onToggleMute={handleToggleMute}
+                onToggleSolo={handleToggleSolo}
+                isAnySoloActive={isAnySoloActive}
+                isSelected={selectedTrackId === track.id}
+                onSelect={handleSelectTrack}
+                onDelete={handleDeleteTrack}
+                onDuplicate={handleDuplicateTrack}
+                onProcess={async (trackId) => {
+                  const current = tracks.find((t) => t.id === trackId);
+                  if (!current || !current.file || isProcessing) return;
+                  setSelectedTrackId(trackId);
+                  setIsProcessing(true);
+                  try {
+                    const processed = await processTrackWithAI(current);
+                    if (processed) {
+                      setTracks((prev) =>
+                        prev.map((t) =>
+                          t.id === trackId
+                            ? {
+                                ...t,
+                                file: processed,
+                              }
+                            : t,
+                        ),
+                      );
                     }
-                  }}
-                />
-              ))}
-            </div>
+                  } catch (error) {
+                    // eslint-disable-next-line no-console
+                    console.error("Error processing track from context menu", error);
+                  } finally {
+                    setIsProcessing(false);
+                  }
+                }}
+              />
+            ))}
           </div>
         </div>
       </div>
