@@ -24,6 +24,8 @@ export type TrackType = {
   pan?: number; // -1 (L) to 1 (R)
   gender?: "male" | "female";
   file?: File;
+  muted?: boolean;
+  solo?: boolean;
 };
 
 type StudioMode =
@@ -57,6 +59,8 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           volume: 0.9,
           pan: 0,
           gender: "male",
+          muted: false,
+          solo: false,
         },
       ];
     case "master-only":
@@ -67,6 +71,8 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           role: "instrument",
           volume: 0.9,
           pan: 0,
+          muted: false,
+          solo: false,
         },
       ];
     case "podcast":
@@ -78,6 +84,8 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           volume: 0.9,
           pan: 0,
           gender: "male",
+          muted: false,
+          solo: false,
         },
         {
           id: "guest",
@@ -86,6 +94,8 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           volume: 0.9,
           pan: 0,
           gender: "female",
+          muted: false,
+          solo: false,
         },
       ];
     case "mix-only":
@@ -93,7 +103,14 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
     case "default":
     default:
       return [
-        { id: "beat", name: "Beat", role: "beat", volume: 0.9 },
+        {
+          id: "beat",
+          name: "Beat",
+          role: "beat",
+          volume: 0.9,
+          muted: false,
+          solo: false,
+        },
         {
           id: "lead",
           name: "Lead Vocal",
@@ -101,6 +118,8 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           volume: 0.9,
           pan: 0,
           gender: "male",
+          muted: false,
+          solo: false,
         },
         {
           id: "bvs",
@@ -109,6 +128,8 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           volume: 0.9,
           pan: 0,
           gender: "male",
+          muted: false,
+          solo: false,
         },
         {
           id: "adlibs",
@@ -117,6 +138,8 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           volume: 0.9,
           pan: 0,
           gender: "male",
+          muted: false,
+          solo: false,
         },
       ];
   }
@@ -308,6 +331,11 @@ export default function MixStudio() {
     return Math.max(...values);
   }, [trackDurations]);
 
+  const isAnySoloActive = useMemo(
+    () => tracks.some((track) => track.solo),
+    [tracks],
+  );
+
   const addTrack = () => {
     setTracks((prev) => {
       const next = [
@@ -319,6 +347,8 @@ export default function MixStudio() {
           volume: 0.9,
           pan: 0,
           gender: "male" as const,
+          muted: false,
+          solo: false,
         },
       ];
       return next;
@@ -330,6 +360,26 @@ export default function MixStudio() {
       prev.map((track) =>
         track.id === trackId
           ? { ...track, pan: Math.max(-1, Math.min(1, pan)) }
+          : track,
+      ),
+    );
+  }, []);
+
+  const handleToggleMute = useCallback((trackId: string) => {
+    setTracks((prev) =>
+      prev.map((track) =>
+        track.id === trackId
+          ? { ...track, muted: !track.muted }
+          : track,
+      ),
+    );
+  }, []);
+
+  const handleToggleSolo = useCallback((trackId: string) => {
+    setTracks((prev) =>
+      prev.map((track) =>
+        track.id === trackId
+          ? { ...track, solo: !track.solo }
           : track,
       ),
     );
@@ -939,6 +989,9 @@ export default function MixStudio() {
                   onPanChange={handlePanChange}
                   onLevelChange={handleTrackLevelChange}
                   onGenderChange={handleTrackGenderChange}
+                  onToggleMute={handleToggleMute}
+                  onToggleSolo={handleToggleSolo}
+                  isAnySoloActive={isAnySoloActive}
                   isSelected={selectedTrackId === track.id}
                   onSelect={handleSelectTrack}
                   onDelete={handleDeleteTrack}
