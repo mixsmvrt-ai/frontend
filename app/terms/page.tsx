@@ -6,11 +6,14 @@ export const metadata: Metadata = {
   description: "Terms of Service for MIXSMVRT, an AI-powered music mixing and mastering platform.",
 };
 
+const TERMS_DESCRIPTION =
+  'These Terms of Service (the "Terms") govern your access to and use of MIXSMVRT, our AI-powered music mixing and mastering tools, and related services. By using MIXSMVRT, you agree to these Terms.';
+
 export default function TermsOfServicePage() {
   return (
     <PolicyLayout
       title="Terms of Service"
-      description="These Terms of Service (the \"Terms\") govern your access to and use of MIXSMVRT, our AI-powered music mixing and mastering tools, and related services. By using MIXSMVRT, you agree to these Terms."
+      description={TERMS_DESCRIPTION}
     >
       <section>
         <h2 className="text-base font-semibold text-red-400 sm:text-lg">Introduction</h2>
