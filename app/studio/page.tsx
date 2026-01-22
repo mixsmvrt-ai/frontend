@@ -216,10 +216,6 @@ export default function MixStudio() {
   const [isAnalyzingReference, setIsAnalyzingReference] = useState(false);
   const [processingOverlay, setProcessingOverlay] =
     useState<ProcessingOverlayState | null>(null);
-  const [horizontalScrollRatio, setHorizontalScrollRatio] = useState(0);
-  const [canScrollHorizontally, setCanScrollHorizontally] = useState(false);
-
-  const arrangementScrollRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
 
@@ -258,35 +254,6 @@ export default function MixStudio() {
     window.addEventListener("wheel", handleWheel, { passive: false });
     return () => window.removeEventListener("wheel", handleWheel);
   }, []);
-
-  // Sync custom horizontal scrollbar with the main arrangement scroll container
-  useEffect(() => {
-    const el = arrangementScrollRef.current;
-    if (!el) return undefined;
-
-    const update = () => {
-      const { scrollWidth, clientWidth, scrollLeft } = el;
-      const maxScroll = scrollWidth - clientWidth;
-      const canScroll = maxScroll > 4;
-      setCanScrollHorizontally(canScroll);
-      if (!canScroll) {
-        setHorizontalScrollRatio(0);
-        return;
-      }
-      const ratio = maxScroll > 0 ? scrollLeft / maxScroll : 0;
-      setHorizontalScrollRatio(ratio);
-    };
-
-    update();
-
-    el.addEventListener("scroll", update);
-    window.addEventListener("resize", update);
-
-    return () => {
-      el.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
-  }, [tracks.length, zoom]);
 
   // Simple transport clock based on play/pause state
   useEffect(() => {
@@ -1006,9 +973,8 @@ export default function MixStudio() {
         onSessionScaleChange={setSessionScale}
       />
 
-      <div className="flex-1 overflow-y-auto bg-black pb-20 sm:pb-0">
-        <div className="w-full overflow-x-auto" ref={arrangementScrollRef}>
-          <div className="min-w-[900px]">
+      <div className="flex-1 overflow-y-auto overflow-x-auto bg-black pb-20 sm:pb-0">
+        <div className="min-w-[900px]">
             <Timeline
               zoom={zoom}
               gridResolution={gridResolution}
@@ -1071,30 +1037,6 @@ export default function MixStudio() {
               ))}
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="border-t border-white/10 bg-black/95 px-3 py-1 text-[10px] text-white/60">
-        <div className="mx-auto flex max-w-6xl items-center gap-3">
-          <span className="hidden sm:inline text-white/40">Arrangement</span>
-          <input
-            type="range"
-            min={0}
-            max={1000}
-            step={1}
-            value={Math.round(horizontalScrollRatio * 1000)}
-            onChange={(event) => {
-              const el = arrangementScrollRef.current;
-              if (!el) return;
-              const raw = Number(event.target.value) / 1000;
-              const ratio = Math.min(1, Math.max(0, raw));
-              const { scrollWidth, clientWidth } = el;
-              const maxScroll = scrollWidth - clientWidth;
-              el.scrollLeft = maxScroll * ratio;
-              setHorizontalScrollRatio(ratio);
-            }}
-            className="h-1 flex-1 cursor-pointer accent-red-500"
-          />
         </div>
       </div>
 
