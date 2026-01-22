@@ -167,8 +167,20 @@ export function ProcessingOverlay({ state, onCancel }: ProcessingOverlayProps) {
               Let MIXSMVRT finish your chain.
             </h2>
           </div>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/60 text-xs text-white/70">
-            {percentage.toFixed(0)}%
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/60 text-xs text-white/70">
+              {percentage.toFixed(0)}%
+            </div>
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                aria-label="Close processing overlay"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 text-[13px] text-white/70 hover:border-white/50 hover:text-white/90"
+              >
+                ×
+              </button>
+            )}
           </div>
         </div>
 
@@ -240,6 +252,18 @@ tuned for streaming and club playback.
             )}
           </div>
         </div>
+
+        {onCancel && (
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex items-center justify-center rounded-full border border-white/20 px-4 py-1.5 text-[12px] font-medium text-white/80 hover:border-red-400 hover:text-red-300"
+            >
+              Cancel processing
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
