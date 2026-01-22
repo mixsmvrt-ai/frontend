@@ -930,6 +930,10 @@ export default function MixStudio() {
   const isCleanupMode = studioMode === "cleanup";
   const isPodcastMode = studioMode === "podcast";
 
+  const handleCancelProcessingOverlay = () => {
+    setProcessingOverlay(null);
+  };
+
   let primaryActionLabel: string;
   if (isCleanupMode) {
     primaryActionLabel = isProcessing ? "Cleaning..." : "Run Cleanup";
@@ -954,7 +958,7 @@ export default function MixStudio() {
     </div>
   ) : (
     <div className="flex min-h-screen flex-col bg-black text-white sm:h-screen">
-      <ProcessingOverlay state={processingOverlay} />
+      <ProcessingOverlay state={processingOverlay} onCancel={handleCancelProcessingOverlay} />
 
       <TransportBar
         isPlaying={isPlaying}
