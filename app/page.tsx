@@ -5,6 +5,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
 type Feature = {
   title: string;
@@ -278,6 +280,32 @@ function TierCard({ name, price, description, highlight, features }: Tier) {
 
 // Public landing page root
 export default function Landing() {
+  const router = useRouter();
+
+  // If a user is already logged in, send them to their home dashboard
+  // instead of keeping them on the public landing page.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    let isMounted = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!isMounted) return;
+        if (data.session) {
+          router.replace("/dashboard");
+        }
+      })
+      .catch(() => {
+        // ignore – landing stays public if session check fails
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
   const features: Feature[] = [
     {
       title: "AI mixing – per-track & full mix",
