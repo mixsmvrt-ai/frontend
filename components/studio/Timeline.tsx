@@ -4,10 +4,12 @@ export default function Timeline({
   zoom,
   gridResolution,
   bpm,
+  onZoomChange,
 }: {
   zoom: number;
   gridResolution: GridResolution;
   bpm: number;
+  onZoomChange: (value: number) => void;
 }) {
   const baseBarWidth = 80;
   const resolutionFactor: Record<GridResolution, number> = {
@@ -39,9 +41,32 @@ export default function Timeline({
               <span key={i}>{i + 1}</span>
             ))}
           </div>
-          <span className="rounded-full border border-white/10 bg-black/60 px-2 py-0.5 text-[10px] text-white/60">
-            {Math.round(bpm)} BPM
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border border-white/10 bg-black/60 px-2 py-0.5 text-[10px] text-white/60">
+              {Math.round(bpm)} BPM
+            </span>
+            <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/60 px-1 py-0.5 text-[10px] text-white/60">
+              <button
+                type="button"
+                onClick={() => onZoomChange(Math.max(0.5, zoom - 0.25))}
+                className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-white/10"
+                aria-label="Zoom out"
+              >
+                −
+              </button>
+              <span className="mx-1 min-w-[36px] text-center text-[10px] text-white/50">
+                {`${Math.round(zoom * 100)}%`}
+              </span>
+              <button
+                type="button"
+                onClick={() => onZoomChange(Math.min(6, zoom + 0.25))}
+                className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-white/10"
+                aria-label="Zoom in"
+              >
+                +
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
