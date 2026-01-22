@@ -31,6 +31,9 @@ type TrackLaneProps = {
   onLevelChange: (trackId: string, level: number) => void;
   onGenderChange: (trackId: string, gender: "male" | "female") => void;
   onPanChange: (trackId: string, pan: number) => void;
+  onToggleMute: (trackId: string) => void;
+  onToggleSolo: (trackId: string) => void;
+  isAnySoloActive: boolean;
   isSelected: boolean;
   onSelect: (trackId: string) => void;
   onDelete: (trackId: string) => void;
@@ -48,6 +51,9 @@ export default function TrackLane({
   onLevelChange,
   onGenderChange,
   onPanChange,
+   onToggleMute,
+   onToggleSolo,
+   isAnySoloActive,
   isSelected,
   onSelect,
   onDelete,
@@ -61,6 +67,7 @@ export default function TrackLane({
   const meterRafRef = useRef<number | null>(null);
   const baseVolumeRef = useRef(track.volume);
   const masterVolumeRef = useRef(masterVolume);
+    const audibleRef = useRef(true);
   const fadeInRef = useRef(true);
   const fadeOutRef = useRef(true);
   const [accentColor, setAccentColor] = useState<string>(
@@ -99,6 +106,23 @@ export default function TrackLane({
   useEffect(() => {
     masterVolumeRef.current = masterVolume;
   }, [masterVolume]);
+
+  useEffect(() => {
+    const muted = track.muted ?? false;
+    const solo = track.solo ?? false;
+    const anySolo = isAnySoloActive;
+
+    const isAudible = !muted && (!anySolo || solo);
+    audibleRef.current = isAudible;
+
+    if (wavesurferRef.current) {
+      const baseVolume = Math.max(
+        0,
+        Math.min(1, baseVolumeRef.current * masterVolumeRef.current),
+      );
+      wavesurferRef.current.setVolume(isAudible ? baseVolume : 0);
+    }
+  }, [track.muted, track.solo, isAnySoloActive]);
 
   useEffect(() => {
     fadeInRef.current = fadeInEnabled;
@@ -168,7 +192,8 @@ export default function TrackLane({
         0,
         Math.min(1, baseVolumeRef.current * masterVolumeRef.current),
       );
-      ws.setVolume(baseVolume * fadeFactor);
+      const audibleVolume = audibleRef.current ? baseVolume : 0;
+      ws.setVolume(audibleVolume * fadeFactor);
     };
 
     ws.on("audioprocess", handleAudioProcess);
@@ -293,7 +318,12 @@ export default function TrackLane({
   // React to volume changes (track or master)
   useEffect(() => {
     if (wavesurferRef.current) {
-      wavesurferRef.current.setVolume(track.volume * masterVolume);
+      const baseVolume = Math.max(
+        0,
+        Math.min(1, track.volume * masterVolume),
+      );
+      const audibleVolume = audibleRef.current ? baseVolume : 0;
+      wavesurferRef.current.setVolume(audibleVolume);
     }
   }, [track.volume, masterVolume]);
 
@@ -530,6 +560,37 @@ export default function TrackLane({
               />
             </div>
             <span className="text-[10px] text-white/50">LVL</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleMute(track.id);
+              }}
+              className={`h-5 w-7 rounded text-[10px] font-semibold transition-colors ${
+                track.muted
+                  ? "bg-zinc-300 text-black"
+                  : "bg-zinc-800 text-white/70 hover:bg-zinc-700"
+              }`}
+            >
+              M
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleSolo(track.id);
+              }}
+              className={`h-5 w-7 rounded text-[10px] font-semibold transition-colors ${
+                track.solo
+                  ? "bg-emerald-400 text-black"
+                  : "bg-zinc-800 text-white/70 hover:bg-zinc-700"
+              }`}
+            >
+              S
+            </button>
           </div>
 
           <div className="flex-1 space-y-1.5">
