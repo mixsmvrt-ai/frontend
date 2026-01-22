@@ -197,7 +197,7 @@ export default function MixStudio() {
     getInitialTracksForMode("default"),
   );
   const [isPlaying, setIsPlaying] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(1.2);
   const [masterVolume, setMasterVolume] = useState(0.9);
   const [trackLevels, setTrackLevels] = useState<Record<string, number>>({});
   const [playheadSeconds, setPlayheadSeconds] = useState(0);
@@ -246,7 +246,10 @@ export default function MixStudio() {
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault();
-        setZoom((z) => Math.min(3, Math.max(0.5, z + (e.deltaY > 0 ? -0.1 : 0.1))));
+        setZoom((z) => {
+          const next = z + (e.deltaY > 0 ? -0.15 : 0.15);
+          return Math.min(6, Math.max(0.5, next));
+        });
       }
     };
     window.addEventListener("wheel", handleWheel, { passive: false });
@@ -974,7 +977,17 @@ export default function MixStudio() {
       <div className="flex-1 overflow-y-auto bg-black pb-20 sm:pb-0">
         <div className="w-full overflow-x-auto">
           <div className="min-w-[900px]">
-            <Timeline zoom={zoom} gridResolution={gridResolution} bpm={bpm} />
+            <Timeline
+              zoom={zoom}
+              gridResolution={gridResolution}
+              bpm={bpm}
+              onZoomChange={(value) =>
+                setZoom((prev) => {
+                  const clamped = Math.min(6, Math.max(0.5, value));
+                  return Number.isFinite(clamped) ? clamped : prev;
+                })
+              }
+            />
 
             <div>
               {tracks.map((track) => (
