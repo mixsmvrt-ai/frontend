@@ -1074,31 +1074,29 @@ export default function MixStudio() {
         </div>
       </div>
 
-      {canScrollHorizontally && (
-        <div className="border-t border-white/10 bg-black/95 px-3 py-1 text-[10px] text-white/60">
-          <div className="mx-auto flex max-w-6xl items-center gap-3">
-            <span className="hidden sm:inline text-white/40">Arrangement</span>
-            <input
-              type="range"
-              min={0}
-              max={1000}
-              step={1}
-              value={Math.round(horizontalScrollRatio * 1000)}
-              onChange={(event) => {
-                const el = arrangementScrollRef.current;
-                if (!el) return;
-                const raw = Number(event.target.value) / 1000;
-                const ratio = Math.min(1, Math.max(0, raw));
-                const { scrollWidth, clientWidth } = el;
-                const maxScroll = scrollWidth - clientWidth;
-                el.scrollLeft = maxScroll * ratio;
-                setHorizontalScrollRatio(ratio);
-              }}
-              className="h-1 flex-1 cursor-pointer accent-red-500"
-            />
-          </div>
+      <div className="border-t border-white/10 bg-black/95 px-3 py-1 text-[10px] text-white/60">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <span className="hidden sm:inline text-white/40">Arrangement</span>
+          <input
+            type="range"
+            min={0}
+            max={1000}
+            step={1}
+            value={Math.round(horizontalScrollRatio * 1000)}
+            onChange={(event) => {
+              const el = arrangementScrollRef.current;
+              if (!el) return;
+              const raw = Number(event.target.value) / 1000;
+              const ratio = Math.min(1, Math.max(0, raw));
+              const { scrollWidth, clientWidth } = el;
+              const maxScroll = scrollWidth - clientWidth;
+              el.scrollLeft = maxScroll * ratio;
+              setHorizontalScrollRatio(ratio);
+            }}
+            className="h-1 flex-1 cursor-pointer accent-red-500"
+          />
         </div>
-      )}
+      </div>
 
       <div className="border-t border-white/10 bg-black/95 text-xs sm:bg-transparent">
         {/* Mobile sticky action bar */}
