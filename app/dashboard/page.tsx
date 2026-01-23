@@ -48,12 +48,6 @@ const quickActions: QuickAction[] = [
     description: "Upload a stereo bounce and get a loud, clean master.",
     icon: "🔊",
   },
-  {
-    id: "podcast",
-    label: "Podcast / Voice",
-    description: "Polish interviews, voice notes, and long‑form audio.",
-    icon: "🎧",
-  },
 ];
 
 const recentProjects: Project[] = [
@@ -93,8 +87,8 @@ const suggestions: Suggestion[] = [
   },
   {
     id: "s3",
-    message: "Try a softer Streaming Ready master for your podcast.",
-    context: "Long‑form voice content benefits from more dynamics.",
+    message: "Try a softer Streaming Ready master for long sets.",
+    context: "Extended mixes and live recordings benefit from more dynamics.",
   },
 ];
 
