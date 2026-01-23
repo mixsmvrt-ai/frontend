@@ -17,7 +17,7 @@ type AdminUserDetail = {
 
 export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
-  const userId = params.id;
+  const userId = params?.id ?? "";
   const [user, setUser] = useState<AdminUserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [creditDelta, setCreditDelta] = useState(10);
