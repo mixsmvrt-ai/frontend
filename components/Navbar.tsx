@@ -17,7 +17,7 @@ const navItems = [
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
