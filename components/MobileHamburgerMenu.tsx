@@ -161,12 +161,16 @@ export function MobileHamburgerMenu({
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
+  // Only render the overlay when open to avoid any chance of an
+  // invisible full-screen layer intercepting taps on mobile.
+  if (!open) {
+    return null;
+  }
+
   return (
     <div
-      className={`fixed inset-0 z-40 sm:hidden transition-opacity duration-300 ${
-        open ? "opacity-100" : "pointer-events-none opacity-0"
-      }`}
-      aria-hidden={!open}
+      className="fixed inset-0 z-40 sm:hidden transition-opacity duration-300 opacity-100"
+      aria-hidden={false}
     >
       {/* Backdrop */}
       <div
@@ -223,6 +227,7 @@ export function MobileHamburgerMenu({
             aria-label="Close navigation menu"
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-xs text-white/80 hover:bg-white/5"
           >
+            
             
 7
           </button>
