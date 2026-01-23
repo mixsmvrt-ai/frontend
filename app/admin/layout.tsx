@@ -37,7 +37,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       if (!isMounted) return;
       if (!isAdmin) {
         setAuthorized(false);
-        router.replace("/login?redirect=" + encodeURIComponent(pathname));
+        const safePath = pathname ?? "/admin";
+        router.replace("/login?redirect=" + encodeURIComponent(safePath));
       } else {
         setAuthorized(true);
       }
