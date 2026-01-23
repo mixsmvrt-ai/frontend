@@ -22,7 +22,7 @@ type AdminJobDetail = {
 
 export default function AdminJobDetailPage() {
   const params = useParams<{ id: string }>();
-  const jobId = params.id;
+  const jobId = params?.id ?? "";
   const [job, setJob] = useState<AdminJobDetail | null>(null);
 
   useEffect(() => {
