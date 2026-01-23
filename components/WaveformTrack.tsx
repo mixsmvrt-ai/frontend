@@ -26,7 +26,8 @@ export function WaveformTrack({ track, zoom }: Props) {
   const { isPlaying } = useSessionStore();
 
   useEffect(() => {
-    if (!track.file || !containerRef.current) return;
+    const file = track.file;
+    if (!file || !containerRef.current) return;
 
     let cancelled = false;
     let objectUrl: string | null = null;
@@ -35,7 +36,7 @@ export function WaveformTrack({ track, zoom }: Props) {
       const WS = await getWaveSurfer();
       if (!WS || cancelled) return;
 
-      objectUrl = URL.createObjectURL(track.file);
+      objectUrl = URL.createObjectURL(file);
       const ws = WS.create({
         container: containerRef.current!,
         waveColor: `${track.color}66`,
