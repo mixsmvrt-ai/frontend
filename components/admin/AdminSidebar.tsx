@@ -21,7 +21,7 @@ const navItems = [
 ];
 
 export function AdminSidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/admin";
 
   return (
     <aside className="hidden w-60 flex-shrink-0 flex-col border-r border-white/10 bg-black/95/90 px-3 py-4 text-xs text-white/70 md:flex">
