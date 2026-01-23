@@ -29,6 +29,37 @@ export function PlanPayPalButtons({ planName, amountLabel, onSuccess, onCancel }
 
   const amount = parseAmount(amountLabel);
 
+  async function notifyBackendCapture(details: any) {
+    try {
+      const amountNumber = Number(amount);
+      const amountCents = Number.isFinite(amountNumber)
+        ? Math.round(amountNumber * 100)
+        : 0;
+
+      await fetch("/api/billing/capture", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          // planName comes in like "Starter plan" or "Mixing & mastering …"
+          plan_key: planName.toLowerCase().includes("starter")
+            ? "starter"
+            : planName.toLowerCase().includes("creator")
+            ? "creator"
+            : planName.toLowerCase().includes("pro")
+            ? "pro"
+            : "starter",
+          amount_cents: amountCents,
+          provider: "paypal",
+          provider_payment_id: details?.id ?? undefined,
+        }),
+      });
+    } catch {
+      // Best-effort only; payment already succeeded in PayPal
+    }
+  }
+
   return (
     <PayPalScriptProvider
       options={{
@@ -55,9 +86,13 @@ export function PlanPayPalButtons({ planName, amountLabel, onSuccess, onCancel }
           });
         }}
         onApprove={async (_data, actions) => {
+          let details: any = null;
           if (actions.order) {
-            await actions.order.capture();
+            details = await actions.order.capture();
           }
+
+          await notifyBackendCapture(details);
+
           if (onSuccess) onSuccess();
         }}
         onCancel={() => {
