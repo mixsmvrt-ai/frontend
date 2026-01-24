@@ -52,6 +52,7 @@ export interface ProcessingOverlayState {
 interface ProcessingOverlayProps {
   state: ProcessingOverlayState | null;
   onCancel?: () => void;
+  onDownload?: () => void;
 }
 
 export function ProgressBar({
@@ -148,7 +149,7 @@ function WaveformSkeleton() {
   );
 }
 
-export function ProcessingOverlay({ state, onCancel }: ProcessingOverlayProps) {
+export function ProcessingOverlay({ state, onCancel, onDownload }: ProcessingOverlayProps) {
   if (!state || !state.active) return null;
 
   const { mode, percentage, currentStageId, completedStageIds, tracks, error } = state;
@@ -194,8 +195,9 @@ export function ProcessingOverlay({ state, onCancel }: ProcessingOverlayProps) {
 
             <div className="mt-2 rounded-xl border border-white/10 bg-black/60 p-2 text-[11px] text-white/60">
               <p>
-                MIXSMVRT is running your audio through a full studio chain
-tuned for streaming and club playback.
+                {error
+                  ? "Something went wrong while processing this audio. You can adjust your upload and try again."
+                  : "MIXSMVRT is running your audio through a full studio chain tuned for streaming and club playback."}
               </p>
             </div>
           </div>
@@ -252,18 +254,34 @@ tuned for streaming and club playback.
             )}
           </div>
         </div>
-
-        {onCancel && (
-          <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="inline-flex items-center justify-center rounded-full border border-white/20 px-4 py-1.5 text-[12px] font-medium text-white/80 hover:border-red-400 hover:text-red-300"
-            >
-              Cancel processing
-            </button>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          {onDownload && !error && (
+            <div className="text-[11px] text-white/70">
+              <p className="font-medium text-white">Your processing is complete.</p>
+              <p className="text-white/60">Download the processed audio to keep working outside the browser.</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-2 sm:justify-start">
+            {onDownload && !error && (
+              <button
+                type="button"
+                onClick={onDownload}
+                className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-1.5 text-[12px] font-medium text-white shadow-[0_0_20px_rgba(225,6,0,0.9)] hover:bg-[#ff291e]"
+              >
+                Download processed audio
+              </button>
+            )}
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="inline-flex items-center justify-center rounded-full border border-white/20 px-4 py-1.5 text-[12px] font-medium text-white/80 hover:border-red-400 hover:text-red-300"
+              >
+                {error ? "Close" : "Cancel"}
+              </button>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
