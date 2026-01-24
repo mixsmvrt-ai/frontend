@@ -646,7 +646,9 @@ export default function MixStudio() {
       // Process each track that has audio through the AI DSP service
       for (let index = 0; index < playable.length; index += 1) {
         const track = playable[index];
-        const progressForTrack = (index / playable.length) * 100;
+        // Show a small non-zero progress value while the first track is running
+        const baseProgress = (index / playable.length) * 100;
+        const progressForTrack = Math.max(5, baseProgress);
 
         setProcessingOverlay((prev): ProcessingOverlayState | null => {
           if (!prev) return prev;
@@ -732,6 +734,18 @@ export default function MixStudio() {
         );
       }
       setHasMixed(anyUpdated);
+      if (anyUpdated) {
+        setProcessingOverlay((prev): ProcessingOverlayState | null =>
+          prev
+            ? {
+                ...prev,
+                percentage: 100,
+                currentStageId: "finalize",
+                completedStageIds: PROCESSING_STAGES.map((s) => s.id),
+              }
+            : prev,
+        );
+      }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Error processing mix with AI", error);
@@ -748,19 +762,7 @@ export default function MixStudio() {
       );
     } finally {
       setIsProcessing(false);
-      setProcessingOverlay((prev) =>
-        prev
-          ? {
-              ...prev,
-              active: false,
-              percentage: prev.error ? prev.percentage : 100,
-              currentStageId: prev.error ? prev.currentStageId : "finalize",
-              completedStageIds: prev.error
-                ? prev.completedStageIds
-                : PROCESSING_STAGES.map((s) => s.id),
-            }
-          : prev,
-      );
+      setProcessingOverlay((prev) => prev);
     }
   };
 
@@ -1004,7 +1006,18 @@ export default function MixStudio() {
     </div>
   ) : (
     <div className="flex min-h-screen flex-col bg-black text-white sm:h-screen">
-      <ProcessingOverlay state={processingOverlay} onCancel={handleCancelProcessingOverlay} />
+      <ProcessingOverlay
+        state={processingOverlay}
+        onCancel={handleCancelProcessingOverlay}
+        onDownload={
+          processingOverlay &&
+          processingOverlay.mode === "mix" &&
+          hasMixed &&
+          tracks.some((track) => track.file)
+            ? handleDownloadMixOnly
+            : undefined
+        }
+      />
 
       <TransportBar
         isPlaying={isPlaying}
