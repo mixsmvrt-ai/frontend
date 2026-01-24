@@ -13,6 +13,10 @@ import {
   type TrackProcessingStatus,
   PROCESSING_STAGES,
 } from "../../components/studio/ProcessingOverlay";
+import {
+  PresetSelector,
+  type StudioPresetMeta,
+} from "../../components/studio/PresetSelector";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +47,7 @@ type FeatureType =
   | "mastering_only";
 
 const DSP_URL = process.env.NEXT_PUBLIC_DSP_URL || "http://localhost:8001";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 const GENRE_TO_DSP_KEY: Record<string, string> = {
   Dancehall: "dancehall",
@@ -232,6 +237,16 @@ export default function MixStudio() {
   const [isAnalyzingReference, setIsAnalyzingReference] = useState(false);
   const [processingOverlay, setProcessingOverlay] =
     useState<ProcessingOverlayState | null>(null);
+  const [availablePresets, setAvailablePresets] = useState<StudioPresetMeta[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const lastPresetByModeRef = useRef<Record<StudioMode, string | null>>({
+    cleanup: null,
+    "mix-only": null,
+    "mix-master": null,
+    "master-only": null,
+    podcast: null,
+    default: null,
+  });
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
 
@@ -255,6 +270,56 @@ export default function MixStudio() {
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
+
+  // Load presets whenever the studio mode changes
+  useEffect(() => {
+    const mapModeToPresetMode = (mode: StudioMode): string | null => {
+      if (mode === "cleanup") return "audio_cleanup";
+      if (mode === "mix-only") return "mixing_only";
+      if (mode === "mix-master") return "mix_and_master";
+      if (mode === "master-only") return "mastering_only";
+      return null;
+    };
+
+    const presetMode = mapModeToPresetMode(studioMode);
+    if (!presetMode) {
+      setAvailablePresets([]);
+      setSelectedPresetId(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`${BACKEND_URL}/studio/presets?mode=${presetMode}`, {
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to load presets", await res.text());
+          return;
+        }
+        const data: StudioPresetMeta[] = await res.json();
+        setAvailablePresets(data);
+
+        const previous = lastPresetByModeRef.current[studioMode];
+        let nextId: string | null = null;
+        if (previous && data.some((p) => p.id === previous)) {
+          nextId = previous;
+        } else if (data.length) {
+          // For beats, prefer Minimal Beat Processing by default when present
+          const minimalBeat = data.find((p) => p.id === "minimal_beat_processing");
+          nextId = minimalBeat?.id ?? data[0].id;
+        }
+        setSelectedPresetId(nextId);
+      })
+      .catch((error) => {
+        if (error.name === "AbortError") return;
+        // eslint-disable-next-line no-console
+        console.error("Error fetching presets", error);
+      });
+
+    return () => controller.abort();
+  }, [studioMode]);
 
   // Ctrl + scroll zoom
   useEffect(() => {
@@ -514,30 +579,19 @@ export default function MixStudio() {
       trackType = "master";
     }
 
-    let presetName: string;
-
-    if (trackType === "beat" || trackType === "master") {
-      // Instrumental / 2-track or full mix bus
-      presetName = "streaming_master";
-    } else {
-      // Vocals family – choose based on specific role
-      if (track.role === "vocal") {
-        // Main / lead vocal
-        presetName = "clean_vocal";
-      } else if (track.role === "background") {
-        // Background stacks / harmonies
-        presetName = "bg_vocal_glue";
-      } else if (track.role === "adlib") {
-        // Adlibs, hype shouts
-        presetName = "adlib_hype";
-      } else {
-        presetName = "clean_vocal";
-      }
-    }
+    const selectedPreset =
+      availablePresets.find((p) => p.id === selectedPresetId) ?? availablePresets[0];
+    const presetName = selectedPreset?.dsp_chain_reference ||
+      (trackType === "beat" || trackType === "master" ? "streaming_master" : "clean_vocal");
 
     formData.append("file", track.file);
     formData.append("track_type", trackType);
     formData.append("preset", presetName);
+
+    // Hint DSP about the processing target so it can apply beat-safe logic
+    const target: "vocal" | "beat" | "full_mix" =
+      trackType === "vocal" ? "vocal" : trackType === "beat" ? "beat" : "full_mix";
+    formData.append("target", target);
 
     if (trackType === "vocal") {
       const gender = track.gender || "male";
@@ -946,6 +1000,7 @@ export default function MixStudio() {
   const isMasterOnlyMode = studioMode === "master-only";
   const isCleanupMode = studioMode === "cleanup";
   const isPodcastMode = studioMode === "podcast";
+  const hasBeatTrack = tracks.some((track) => track.role === "beat" && track.file);
 
   const handleCancelProcessingOverlay = () => {
     setProcessingOverlay(null);
@@ -1188,6 +1243,29 @@ export default function MixStudio() {
                   )}
                 </span>
               )}
+            </div>
+
+            <div className="hidden min-w-[220px] max-w-xs sm:block">
+              <PresetSelector
+                presets={availablePresets}
+                modeLabel={
+                  isCleanupMode
+                    ? "Audio Cleanup"
+                    : isMixOnlyMode
+                      ? "Mixing Only"
+                      : isMixMasterMode
+                        ? "Mixing & Mastering"
+                        : isMasterOnlyMode
+                          ? "Mastering Only"
+                          : "Studio"
+                }
+                selectedPresetId={selectedPresetId}
+                onChange={(presetId) => {
+                  setSelectedPresetId(presetId);
+                  lastPresetByModeRef.current[studioMode] = presetId;
+                }}
+                hasBeatTrack={hasBeatTrack}
+              />
             </div>
 
             <div className="flex gap-2">
