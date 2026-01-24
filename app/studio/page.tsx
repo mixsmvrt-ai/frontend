@@ -36,6 +36,12 @@ type StudioMode =
   | "podcast"
   | "default";
 
+type FeatureType =
+  | "audio_cleanup"
+  | "mixing_only"
+  | "mix_master"
+  | "mastering_only";
+
 const DSP_URL = process.env.NEXT_PUBLIC_DSP_URL || "http://localhost:8001";
 
 const GENRE_TO_DSP_KEY: Record<string, string> = {
@@ -148,6 +154,13 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
 export default function MixStudio() {
   const router = useRouter();
   const [authChecking, setAuthChecking] = useState(true);
+  const [userFeatureAccess, setUserFeatureAccess] = useState<Record<FeatureType, boolean>>({
+    audio_cleanup: false,
+    mixing_only: false,
+    mix_master: false,
+    mastering_only: false,
+  });
+  const [showUpgradeModal, setShowUpgradeModal] = useState<FeatureType | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -165,6 +178,9 @@ export default function MixStudio() {
           router.replace("/login");
           return;
         }
+        // In a future iteration, this can call a dedicated backend
+        // entitlement endpoint. For now, default to all features locked
+        // visually; backend remains the source of truth.
         setAuthChecking(false);
       })
       .catch(() => {
@@ -934,6 +950,16 @@ export default function MixStudio() {
     setProcessingOverlay(null);
   };
 
+  const featureForMode: FeatureType | null = isCleanupMode
+    ? "audio_cleanup"
+    : isMixOnlyMode
+      ? "mixing_only"
+      : isMixMasterMode
+        ? "mix_master"
+        : isMasterOnlyMode
+          ? "mastering_only"
+          : null;
+
   let primaryActionLabel: string;
   if (isCleanupMode) {
     primaryActionLabel = isProcessing ? "Cleaning..." : "Run Cleanup";
@@ -977,7 +1003,7 @@ export default function MixStudio() {
         onSessionScaleChange={setSessionScale}
       />
 
-      <div className="flex-1 overflow-y-auto overflow-x-auto bg-black pb-20 sm:pb-0">
+      <div className="flex-1 overflow-y-auto overflow-x-auto bg-black pb-28 sm:pb-0">
         <div className="min-w-[900px]">
           <Timeline
             zoom={zoom}
@@ -1229,8 +1255,117 @@ export default function MixStudio() {
               )}
             </div>
           </div>
+          {/* Primary processing action with simple visual gating */}
+          <div className="sticky bottom-0 z-10 border-t border-white/10 bg-gradient-to-t from-black via-black/95 to-black/80 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col text-[11px] text-white/60">
+                <span className="font-medium text-white/80">Primary processing</span>
+                <span>
+                  {featureForMode === "audio_cleanup" && "Audio Cleanup"}
+                  {featureForMode === "mixing_only" && "Mixing Only"}
+                  {featureForMode === "mix_master" && "Mixing & Mastering"}
+                  {featureForMode === "mastering_only" && "Mastering Only"}
+                  {!featureForMode && "Full Mix"}
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={() => {
+                  if (featureForMode && !userFeatureAccess[featureForMode]) {
+                    setShowUpgradeModal(featureForMode);
+                    return;
+                  }
+                  void handleProcessSelectedTrack();
+                }}
+                className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                  featureForMode && !userFeatureAccess[featureForMode]
+                    ? "border border-white/15 bg-transparent text-white/70"
+                    : "bg-brand-primary text-white shadow-[0_0_30px_rgba(225,6,0,0.9)] hover:bg-[#ff291e]"
+                }`}
+              >
+                {featureForMode && !userFeatureAccess[featureForMode] && (
+                  <span aria-hidden="true">🔒</span>
+                )}
+                <span>{primaryActionLabel}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+      {/* Simple upgrade modal shell – wiring to PayPal checkout/webhooks happens elsewhere */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#050509]/95 p-4 shadow-[0_0_45px_rgba(0,0,0,0.85)]">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-400">
+                  Unlock processing
+                </p>
+                <h2 className="mt-1 text-sm font-semibold text-white">
+                  This feature is locked for your account.
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(null)}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 text-xs text-white/80 hover:bg-white/5"
+                aria-label="Close upgrade dialog"
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="text-[12px] text-white/70">
+              Upgrade to a monthly subscription for full access, or purchase a
+              one-off credit to run this specific processing type.
+            </p>
+
+            <div className="mt-4 space-y-3 text-[12px]">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                  Monthly subscription
+                </p>
+                <p className="mt-1 text-sm font-medium text-white">Full studio access</p>
+                <p className="mt-1 text-[12px] text-white/70">
+                  Unlimited audio cleanup, mixing, mixing &amp; mastering, and
+                  mastering while your subscription is active.
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 inline-flex h-9 items-center justify-center rounded-full bg-brand-primary px-4 text-[12px] font-medium text-white shadow-[0_0_22px_rgba(225,6,0,0.9)] hover:bg-[#ff291e]"
+                >
+                  Continue to subscription checkout
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">
+                  Pay-as-you-go
+                </p>
+                <p className="mt-1 text-sm font-medium text-white">
+                  Unlock this feature only
+                </p>
+                <p className="mt-1 text-[12px] text-white/70">
+                  Buy a single credit to run this processing once. Credits are
+                  applied immediately after checkout.
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 inline-flex h-9 items-center justify-center rounded-full border border-white/20 px-4 text-[12px] font-medium text-white hover:border-brand-primary hover:text-brand-primary"
+                >
+                  Purchase a one-off credit
+                </button>
+              </div>
+            </div>
+
+            <p className="mt-3 text-[11px] text-white/50">
+              Powered by secure PayPal checkout. You&apos;ll return here
+              automatically once your payment is complete.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
