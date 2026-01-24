@@ -774,7 +774,10 @@ export default function TrackLane({
         )}
         <div
           ref={containerRef}
-          className="relative z-10 h-[72px] w-full overflow-hidden"
+            className={`relative z-10 h-[72px] w-full overflow-hidden transform transition-transform duration-300 ${
+              track.processed ? "scale-y-110" : "scale-y-100"
+            }`}
+            style={{ transformOrigin: "center center" }}
         />
       </div>
 
