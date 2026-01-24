@@ -30,6 +30,8 @@ export type TrackType = {
   file?: File;
   muted?: boolean;
   solo?: boolean;
+  // Visually indicate that this track's audio has been processed/mastered.
+  processed?: boolean;
 };
 
 type StudioMode =
@@ -72,6 +74,7 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           gender: "male",
           muted: false,
           solo: false,
+          processed: false,
         },
       ];
     case "master-only":
@@ -84,6 +87,7 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           pan: 0,
           muted: false,
           solo: false,
+          processed: false,
         },
       ];
     case "podcast":
@@ -97,6 +101,7 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           gender: "male",
           muted: false,
           solo: false,
+          processed: false,
         },
         {
           id: "guest",
@@ -107,6 +112,7 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           gender: "female",
           muted: false,
           solo: false,
+          processed: false,
         },
       ];
     case "mix-only":
@@ -121,6 +127,7 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           volume: 0.9,
           muted: false,
           solo: false,
+          processed: false,
         },
         {
           id: "lead",
@@ -131,6 +138,7 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           gender: "male",
           muted: false,
           solo: false,
+          processed: false,
         },
         {
           id: "bvs",
@@ -141,6 +149,7 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           gender: "male",
           muted: false,
           solo: false,
+          processed: false,
         },
         {
           id: "adlibs",
@@ -151,6 +160,7 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
           gender: "male",
           muted: false,
           solo: false,
+          processed: false,
         },
       ];
   }
@@ -370,7 +380,16 @@ export default function MixStudio() {
 
   const handleFileSelected = useCallback((trackId: string, file: File) => {
     setTracks((prev) =>
-      prev.map((track) => (track.id === trackId ? { ...track, file } : track)),
+      prev.map((track) =>
+        track.id === trackId
+          ? {
+              ...track,
+              file,
+              // New upload resets any previous processed state.
+              processed: false,
+            }
+          : track,
+      ),
     );
   }, []);
 
@@ -761,6 +780,9 @@ export default function MixStudio() {
               ? {
                   ...track,
                   file: updates.get(track.id) ?? track.file,
+                  // Mark tracks whose audio has been updated by the AI
+                  // pipeline so their waveforms can appear "bigger".
+                  processed: true,
                 }
               : track,
           ),
@@ -833,6 +855,7 @@ export default function MixStudio() {
               ? {
                   ...track,
                   file: processed,
+                  processed: true,
                 }
               : track,
           ),
@@ -900,6 +923,7 @@ export default function MixStudio() {
               ? {
                   ...track,
                   file: processed,
+                  processed: true,
                 }
               : track,
           ),
@@ -1118,6 +1142,7 @@ export default function MixStudio() {
                             ? {
                                 ...t,
                                 file: processed,
+                                processed: true,
                               }
                             : t,
                         ),
