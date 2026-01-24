@@ -556,10 +556,30 @@ export default function MixStudio() {
       );
     }
 
-    const response = await fetch(`${DSP_URL}/process`, {
-      method: "POST",
-      body: formData,
-    });
+    // Call the DSP service with a timeout so the UI doesn't hang forever
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 45000);
+
+    let response: Response;
+    try {
+      response = await fetch(`${DSP_URL}/process`, {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      window.clearTimeout(timeoutId);
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error(
+          "Timed out contacting the processing server. Please try again in a moment.",
+        );
+      }
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to reach the processing server.");
+    }
+
+    window.clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
