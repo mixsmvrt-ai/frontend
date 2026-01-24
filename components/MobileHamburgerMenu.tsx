@@ -297,10 +297,10 @@ export function MobileHamburgerMenu({
                 </Link>
 
                 <Link
-                  href="/uploads"
+                  href="/upload-history"
                   onClick={onClose}
                   className={`mt-1 block rounded-2xl px-3 py-3 text-[14px] transition-colors ${
-                    isLinkActive("/uploads")
+                    isLinkActive("/upload-history")
                       ? "bg-white/10 text-white"
                       : "text-white/80 hover:bg-white/5"
                   }`}
