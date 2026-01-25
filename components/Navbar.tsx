@@ -79,7 +79,11 @@ export function Navbar() {
   useEffect(() => {
     if (!open) return;
     setOpen(false);
-  }, [pathname, open]);
+    // We intentionally only react to pathname changes here so the
+    // hamburger button can toggle the menu open without this effect
+    // immediately closing it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-brand-bg/95 backdrop-blur-xl">
