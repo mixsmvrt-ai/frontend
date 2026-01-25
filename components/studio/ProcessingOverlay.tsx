@@ -2,16 +2,7 @@
 
 import React from "react";
 
-export type ProcessingStageId =
-  | "analyze"
-  | "detect-vocals"
-  | "denoise"
-  | "eq"
-  | "compress"
-  | "saturate"
-  | "stereo"
-  | "loudness"
-  | "finalize";
+export type ProcessingStageId = string;
 
 export type ProcessingStage = {
   id: ProcessingStageId;
@@ -51,6 +42,7 @@ export interface ProcessingOverlayState {
 
 interface ProcessingOverlayProps {
   state: ProcessingOverlayState | null;
+  stages?: ProcessingStage[];
   onCancel?: () => void;
   onDownload?: () => void;
 }
@@ -149,12 +141,12 @@ function WaveformSkeleton() {
   );
 }
 
-export function ProcessingOverlay({ state, onCancel, onDownload }: ProcessingOverlayProps) {
+export function ProcessingOverlay({ state, stages, onCancel, onDownload }: ProcessingOverlayProps) {
   if (!state || !state.active) return null;
 
   const { mode, percentage, currentStageId, completedStageIds, tracks, error } = state;
-
-  const currentStage = PROCESSING_STAGES.find((s) => s.id === currentStageId);
+  const stageList = stages && stages.length ? stages : PROCESSING_STAGES;
+  const currentStage = stageList.find((s) => s.id === currentStageId);
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 px-4 backdrop-blur-md">
@@ -204,7 +196,7 @@ export function ProcessingOverlay({ state, onCancel, onDownload }: ProcessingOve
 
           <div className="flex flex-col gap-3">
             <ProcessingStageList
-              stages={PROCESSING_STAGES}
+              stages={stageList}
               currentStageId={currentStageId}
               completedStageIds={completedStageIds}
             />
