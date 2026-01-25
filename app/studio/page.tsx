@@ -12,11 +12,13 @@ import {
   type ProcessingOverlayState,
   type TrackProcessingStatus,
   PROCESSING_STAGES,
+  type ProcessingStage,
 } from "../../components/studio/ProcessingOverlay";
 import {
   PresetSelector,
   type StudioPresetMeta,
 } from "../../components/studio/PresetSelector";
+import { useBackendJobStatus } from "../../lib/useBackendJobStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,14 @@ type FeatureType =
 
 const DSP_URL = process.env.NEXT_PUBLIC_DSP_URL || "http://localhost:8001";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+function featureTypeForMode(mode: StudioMode): FeatureType | null {
+  if (mode === "cleanup") return "audio_cleanup";
+  if (mode === "mix-only") return "mixing_only";
+  if (mode === "mix-master") return "mix_master";
+  if (mode === "master-only") return "mastering_only";
+  return null;
+}
 
 const GENRE_TO_DSP_KEY: Record<string, string> = {
   Dancehall: "dancehall",
@@ -247,6 +257,10 @@ export default function MixStudio() {
   const [isAnalyzingReference, setIsAnalyzingReference] = useState(false);
   const [processingOverlay, setProcessingOverlay] =
     useState<ProcessingOverlayState | null>(null);
+  const [overlayStages, setOverlayStages] = useState<ProcessingStage[] | undefined>(
+    undefined,
+  );
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [availablePresets, setAvailablePresets] = useState<StudioPresetMeta[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const lastPresetByModeRef = useRef<Record<StudioMode, string | null>>({
@@ -259,6 +273,8 @@ export default function MixStudio() {
   });
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
+
+  const backendJobStatus = useBackendJobStatus(activeJobId);
 
   // Reset layout when mode changes
   useEffect(() => {
@@ -392,6 +408,50 @@ export default function MixStudio() {
       ),
     );
   }, []);
+
+  // Keep the processing overlay in sync with backend job progress & steps
+  useEffect(() => {
+    if (!backendJobStatus) return;
+
+    setProcessingOverlay((prev): ProcessingOverlayState | null => {
+      if (!prev) return prev;
+
+      const steps = backendJobStatus.steps ?? undefined;
+      let currentStageId = prev.currentStageId;
+      let completedStageIds = prev.completedStageIds;
+
+      if (steps && steps.length) {
+        const dynamicStages: ProcessingStage[] = steps.map((s) => ({
+          id: s.name,
+          label: s.name,
+        }));
+        setOverlayStages(dynamicStages);
+
+        const completedNames = steps.filter((s) => s.completed).map((s) => s.name);
+        const firstIncomplete = steps.find((s) => !s.completed);
+        currentStageId = firstIncomplete?.name ?? steps[steps.length - 1].name;
+        completedStageIds = completedNames;
+      }
+
+      const nextError =
+        backendJobStatus.status === "failed"
+          ? backendJobStatus.error_message ||
+            prev.error ||
+            "Something went wrong while processing this audio."
+          : prev.error;
+
+      return {
+        ...prev,
+        percentage:
+          typeof backendJobStatus.progress === "number"
+            ? backendJobStatus.progress
+            : prev.percentage,
+        currentStageId,
+        completedStageIds,
+        error: nextError,
+      };
+    });
+  }, [backendJobStatus]);
 
   const handleVolumeChange = useCallback((trackId: string, volume: number) => {
     setTracks((prev) =>
@@ -690,6 +750,61 @@ export default function MixStudio() {
       tracks: initialTrackStatuses,
       error: null,
     });
+
+    // Kick off a backend processing job so the overlay can track
+    // real step-based progress via /status/{job_id}. This currently
+    // drives Supabase job rows and the UI, while the DSP service
+    // handles the actual per-track processing below.
+    try {
+      const featureType = featureTypeForMode(studioMode) ?? "mix_master";
+      const payload = {
+        user_id: null as string | null,
+        feature_type: featureType,
+        job_type: featureType,
+        preset_id: selectedPresetId,
+        target: "full_mix" as const,
+        input_files: {
+          _meta: {
+            display_name: "Studio session mix",
+          },
+        },
+      };
+
+      const res = await fetch(`${BACKEND_URL}/process`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as {
+          id: string;
+          steps?: { name: string; completed: boolean }[];
+        };
+        setActiveJobId(data.id);
+        if (data.steps && data.steps.length) {
+          const dynamicStages: ProcessingStage[] = data.steps.map((s) => ({
+            id: s.name,
+            label: s.name,
+          }));
+          setOverlayStages(dynamicStages);
+        } else {
+          setOverlayStages(undefined);
+        }
+      } else {
+        // eslint-disable-next-line no-console
+        console.error("Failed to create backend processing job", await res.text());
+        setActiveJobId(null);
+        setOverlayStages(undefined);
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Error creating backend processing job", error);
+      setActiveJobId(null);
+      setOverlayStages(undefined);
+    }
 
     try {
       const updates = new Map<string, File>();
@@ -1028,6 +1143,8 @@ export default function MixStudio() {
 
   const handleCancelProcessingOverlay = () => {
     setProcessingOverlay(null);
+    setActiveJobId(null);
+    setOverlayStages(undefined);
   };
 
   const featureForMode: FeatureType | null = isCleanupMode
@@ -1066,6 +1183,7 @@ export default function MixStudio() {
     <div className="flex min-h-screen flex-col bg-black text-white sm:h-screen">
       <ProcessingOverlay
         state={processingOverlay}
+        stages={overlayStages}
         onCancel={handleCancelProcessingOverlay}
         onDownload={
           processingOverlay &&
