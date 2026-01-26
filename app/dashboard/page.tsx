@@ -149,6 +149,11 @@ export default function Dashboard() {
               </div>
               <Link
                 href="/studio"
+                onClick={(event) => {
+                  event.preventDefault();
+                  const ev = new CustomEvent("open-studio-flow", { bubbles: true });
+                  event.currentTarget.dispatchEvent(ev);
+                }}
                 className="inline-flex items-center justify-center rounded-full bg-brand-primary px-3 py-1.5 text-[11px] font-medium text-white transition-colors duration-150 hover:bg-[#ff291e]"
               >
                 New project
@@ -214,6 +219,11 @@ export default function Dashboard() {
               </p>
               <Link
                 href="/studio"
+                onClick={(event) => {
+                  event.preventDefault();
+                  const ev = new CustomEvent("open-studio-flow", { bubbles: true });
+                  event.currentTarget.dispatchEvent(ev);
+                }}
                 className="mt-3 inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-1.5 text-[11px] font-medium text-white transition-colors duration-150 hover:bg-[#ff291e]"
               >
                 Go to MIXSMVRT Studio
