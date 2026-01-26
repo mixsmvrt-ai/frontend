@@ -8,6 +8,8 @@ import { AvatarDropdown } from "./AvatarDropdown";
 import { MobileHamburgerMenu } from "./MobileHamburgerMenu";
 import { Logo } from "./Logo";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
+import { useEffect as useClientEffect } from "react";
+import { useStudioFlowModal } from "./StudioFlowModal";
 
 const navItems = [
   { label: "Studio", href: "/studio" },
@@ -20,6 +22,17 @@ export function Navbar() {
   const pathname = usePathname() ?? "/";
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { open: openStudioModal } = useStudioFlowModal();
+
+  // Listen for a bubbling custom event from other Studio links
+  // (e.g. homepage or dashboard CTAs) and open the flow modal.
+  useClientEffect(() => {
+    const handler = () => {
+      openStudioModal();
+    };
+    window.addEventListener("open-studio-flow", handler as EventListener);
+    return () => window.removeEventListener("open-studio-flow", handler as EventListener);
+  }, [openStudioModal]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -95,6 +108,12 @@ export function Navbar() {
               <Link
                 key={item.label}
                 href={item.href}
+                onClick={(event) => {
+                  if (item.href === "/studio") {
+                    event.preventDefault();
+                    openStudioModal();
+                  }
+                }}
                 className={`relative inline-flex items-center gap-1 transition-colors hover:text-brand-accent ${
                   item.href !== "/#features" &&
                   (pathname === item.href || pathname.startsWith(`${item.href}/`))
@@ -157,6 +176,7 @@ export function Navbar() {
         planLabel={planLabel}
         pathname={pathname}
         onLogout={handleLogout}
+        onOpenStudioModal={openStudioModal}
       />
     </header>
   );

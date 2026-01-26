@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
+import { useStudioFlowModal } from "./StudioFlowModal";
 
 type AvatarDropdownProps = {
   user: User;
@@ -65,6 +66,8 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open]);
+
+  const { open: openStudioModal } = useStudioFlowModal();
 
   const handleToggle = () => {
     setOpen((value) => !value);
@@ -150,7 +153,11 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
             <Link
               href="/studio"
               role="menuitem"
-              onClick={handleMenuItemClick()}
+              onClick={(event) => {
+                event.preventDefault();
+                setOpen(false);
+                openStudioModal();
+              }}
               ref={firstItemRef as any}
               className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[12px] text-white/90 transition hover:bg-white/5"
             >
