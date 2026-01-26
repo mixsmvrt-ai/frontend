@@ -17,6 +17,7 @@ import {
 import {
   PresetSelector,
   type StudioPresetMeta,
+  type ThrowFxMode,
 } from "../../components/studio/PresetSelector";
 import { useBackendJobStatus } from "../../lib/useBackendJobStatus";
 
@@ -255,6 +256,7 @@ export default function MixStudio() {
   const [referenceProfile, setReferenceProfile] = useState<any | null>(null);
   const [referenceAnalysis, setReferenceAnalysis] = useState<any | null>(null);
   const [isAnalyzingReference, setIsAnalyzingReference] = useState(false);
+  const [throwFxMode, setThrowFxMode] = useState<ThrowFxMode>("off");
   const [processingOverlay, setProcessingOverlay] =
     useState<ProcessingOverlayState | null>(null);
   const [overlayStages, setOverlayStages] = useState<ProcessingStage[] | undefined>(
@@ -675,6 +677,15 @@ export default function MixStudio() {
     if (trackType === "vocal") {
       const gender = track.gender || "male";
       formData.append("gender", gender);
+
+      const currentMode = studioMode;
+      if (
+        (currentMode === "mix-only" || currentMode === "mix-master") &&
+        throwFxMode &&
+        throwFxMode !== "off"
+      ) {
+        formData.append("throw_fx_mode", throwFxMode);
+      }
     }
 
     const genreKey = GENRE_TO_DSP_KEY[genre];
@@ -1408,6 +1419,9 @@ export default function MixStudio() {
                   lastPresetByModeRef.current[studioMode] = presetId;
                 }}
                 hasBeatTrack={hasBeatTrack}
+                showThrowFxControls={isMixOnlyMode || isMixMasterMode}
+                throwFxMode={throwFxMode}
+                onThrowFxModeChange={setThrowFxMode}
               />
             </div>
 
