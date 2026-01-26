@@ -543,6 +543,15 @@ export default function Landing() {
                 </span>
                 <Link
                   href="/studio"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    // Defer to the global StudioFlow modal; Navbar
+                    // and other shells host it so this link simply
+                    // relies on the user opening Studio from the
+                    // main navigation.
+                    const ev = new CustomEvent("open-studio-flow", { bubbles: true });
+                    event.currentTarget.dispatchEvent(ev);
+                  }}
                   className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-1.5 text-[11px] font-medium text-white transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#ff291e]"
                 >
                   Try your own track
