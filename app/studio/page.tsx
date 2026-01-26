@@ -251,6 +251,7 @@ export default function MixStudio() {
   const [sessionKey, setSessionKey] = useState<string>("C");
   const [sessionScale, setSessionScale] = useState<"Major" | "Minor">("Major");
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [selectedClipTrackId, setSelectedClipTrackId] = useState<string | null>(null);
   const [hasMixed, setHasMixed] = useState(false);
   const [isMastering, setIsMastering] = useState(false);
   const [referenceProfile, setReferenceProfile] = useState<any | null>(null);
@@ -613,6 +614,7 @@ export default function MixStudio() {
 
   const handleSelectTrack = (trackId: string) => {
     setSelectedTrackId(trackId);
+    setSelectedClipTrackId(null);
   };
 
   const handleDeleteTrack = (trackId: string) => {
@@ -626,6 +628,30 @@ export default function MixStudio() {
       return rest;
     });
     setSelectedTrackId((current) => (current === trackId ? null : current));
+    setSelectedClipTrackId((current) => (current === trackId ? null : current));
+  };
+
+  const handleClearTrackAudio = (trackId: string) => {
+    setTracks((prev) =>
+      prev.map((track) =>
+        track.id === trackId
+          ? {
+              ...track,
+              file: undefined,
+              processed: false,
+            }
+          : track,
+      ),
+    );
+    setTrackDurations((prev) => {
+      const { [trackId]: _removed, ...rest } = prev;
+      return rest;
+    });
+    setTrackLevels((prev) => {
+      const { [trackId]: _removed, ...rest } = prev;
+      return rest;
+    });
+    setSelectedClipTrackId((current) => (current === trackId ? null : current));
   };
 
   const handleDuplicateTrack = (trackId: string) => {
@@ -1135,15 +1161,26 @@ export default function MixStudio() {
       }
 
       if (!event.altKey && event.key === "Delete") {
-        if (!selectedTrackId) return;
         event.preventDefault();
+        if (selectedClipTrackId) {
+          handleClearTrackAudio(selectedClipTrackId);
+          return;
+        }
+        if (!selectedTrackId) return;
         handleDeleteTrack(selectedTrackId);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleProcessSelectedTrack, handleDuplicateTrack, handleDeleteTrack, selectedTrackId]);
+  }, [
+    handleProcessSelectedTrack,
+    handleDuplicateTrack,
+    handleDeleteTrack,
+    handleClearTrackAudio,
+    selectedTrackId,
+    selectedClipTrackId,
+  ]);
 
   const isMixMasterMode = studioMode === "mix-master";
   const isMixOnlyMode = studioMode === "mix-only";
@@ -1255,6 +1292,9 @@ export default function MixStudio() {
                 isAnySoloActive={isAnySoloActive}
                 isSelected={selectedTrackId === track.id}
                 onSelect={handleSelectTrack}
+                isAudioSelected={selectedClipTrackId === track.id}
+                onSelectAudio={(trackId) => setSelectedClipTrackId(trackId)}
+                onClearAudio={handleClearTrackAudio}
                 onDelete={handleDeleteTrack}
                 onDuplicate={handleDuplicateTrack}
                 onProcess={async (trackId) => {
