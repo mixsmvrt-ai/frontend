@@ -13,6 +13,7 @@ import {
   type TrackProcessingStatus,
   PROCESSING_STAGES,
   type ProcessingStage,
+  FLOW_PROCESSING_STAGE_TEMPLATES,
 } from "../../components/studio/ProcessingOverlay";
 import {
   PresetSelector,
@@ -770,6 +771,14 @@ export default function MixStudio() {
     setIsProcessing(true);
     setHasMixed(false);
 
+    const featureType = featureTypeForMode(studioMode) ?? "mix_master";
+    const flowStages =
+      FLOW_PROCESSING_STAGE_TEMPLATES[featureType] &&
+      FLOW_PROCESSING_STAGE_TEMPLATES[featureType].length
+        ? FLOW_PROCESSING_STAGE_TEMPLATES[featureType]
+        : PROCESSING_STAGES;
+    const initialStageId = (flowStages[0] ?? PROCESSING_STAGES[0]).id;
+
     const playable = tracks.filter((track) => track.file);
     const initialTrackStatuses: TrackProcessingStatus[] = playable.map((track) => ({
       id: track.id,
@@ -782,18 +791,20 @@ export default function MixStudio() {
       active: true,
       mode: "mix",
       percentage: 0,
-      currentStageId: "analyze",
+      currentStageId: initialStageId,
       completedStageIds: [],
       tracks: initialTrackStatuses,
       error: null,
     });
+
+    // Seed overlay with the flow-specific stages immediately.
+    setOverlayStages(flowStages);
 
     // Kick off a backend processing job so the overlay can track
     // real step-based progress via /status/{job_id}. This currently
     // drives Supabase job rows and the UI, while the DSP service
     // handles the actual per-track processing below.
     try {
-      const featureType = featureTypeForMode(studioMode) ?? "mix_master";
       const payload = {
         user_id: null as string | null,
         feature_type: featureType,
@@ -868,13 +879,11 @@ export default function MixStudio() {
           });
 
           const stageIndex = Math.min(
-            PROCESSING_STAGES.length - 1,
-            Math.floor((progressForTrack / 100) * PROCESSING_STAGES.length),
+            flowStages.length - 1,
+            Math.floor((progressForTrack / 100) * flowStages.length),
           );
-          const currentStage = PROCESSING_STAGES[stageIndex];
-          const completedStageIds = PROCESSING_STAGES.slice(0, stageIndex).map(
-            (s) => s.id,
-          );
+          const currentStage = flowStages[stageIndex];
+          const completedStageIds = flowStages.slice(0, stageIndex).map((s) => s.id);
 
           return {
             ...prev,
@@ -906,13 +915,13 @@ export default function MixStudio() {
             });
 
             const stageIndex = Math.min(
-              PROCESSING_STAGES.length - 1,
-              Math.floor((completedPercent / 100) * PROCESSING_STAGES.length),
+              flowStages.length - 1,
+              Math.floor((completedPercent / 100) * flowStages.length),
             );
-            const currentStage = PROCESSING_STAGES[stageIndex];
-            const completedStageIds = PROCESSING_STAGES.slice(0, stageIndex + 1).map(
-              (s) => s.id,
-            );
+            const currentStage = flowStages[stageIndex];
+            const completedStageIds = flowStages
+              .slice(0, stageIndex + 1)
+              .map((s) => s.id);
 
             return {
               ...prev,
@@ -947,8 +956,9 @@ export default function MixStudio() {
             ? {
                 ...prev,
                 percentage: 100,
-                currentStageId: "finalize",
-                completedStageIds: PROCESSING_STAGES.map((s) => s.id),
+                currentStageId:
+                  (flowStages[flowStages.length - 1] ?? flowStages[0]).id,
+                completedStageIds: flowStages.map((s) => s.id),
               }
             : prev,
         );
@@ -980,6 +990,14 @@ export default function MixStudio() {
     const target = tracks.find((track) => track.id === selectedTrackId);
     if (!target || !target.file) return;
 
+    const featureType = featureTypeForMode(studioMode) ?? "mix_master";
+    const flowStages =
+      FLOW_PROCESSING_STAGE_TEMPLATES[featureType] &&
+      FLOW_PROCESSING_STAGE_TEMPLATES[featureType].length
+        ? FLOW_PROCESSING_STAGE_TEMPLATES[featureType]
+        : PROCESSING_STAGES;
+    const initialStageId = (flowStages[0] ?? PROCESSING_STAGES[0]).id;
+
     const trackStatus: TrackProcessingStatus = {
       id: target.id,
       name: target.name || target.id,
@@ -991,11 +1009,13 @@ export default function MixStudio() {
       active: true,
       mode: "track",
       percentage: 0,
-      currentStageId: "analyze",
+      currentStageId: initialStageId,
       completedStageIds: [],
       tracks: [trackStatus],
       error: null,
     });
+
+    setOverlayStages(flowStages);
 
     setIsProcessing(true);
     try {
@@ -1035,10 +1055,12 @@ export default function MixStudio() {
               ...prev,
               active: false,
               percentage: prev.error ? prev.percentage : 100,
-              currentStageId: prev.error ? prev.currentStageId : "finalize",
+              currentStageId: prev.error
+                ? prev.currentStageId
+                : (flowStages[flowStages.length - 1] ?? flowStages[0]).id,
               completedStageIds: prev.error
                 ? prev.completedStageIds
-                : PROCESSING_STAGES.map((s) => s.id),
+                : flowStages.map((s) => s.id),
             }
           : prev,
       );
