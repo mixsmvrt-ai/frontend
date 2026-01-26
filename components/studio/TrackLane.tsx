@@ -36,6 +36,9 @@ type TrackLaneProps = {
   isAnySoloActive: boolean;
   isSelected: boolean;
   onSelect: (trackId: string) => void;
+  isAudioSelected?: boolean;
+  onSelectAudio?: (trackId: string | null) => void;
+  onClearAudio?: (trackId: string) => void;
   onDelete: (trackId: string) => void;
   onDuplicate: (trackId: string) => void;
   onProcess: (trackId: string) => void;
@@ -56,6 +59,9 @@ export default function TrackLane({
    isAnySoloActive,
   isSelected,
   onSelect,
+  isAudioSelected,
+  onSelectAudio,
+  onClearAudio,
   onDelete,
   onDuplicate,
   onProcess,
@@ -482,17 +488,34 @@ export default function TrackLane({
       onClick={(event) => {
         const target = event.target as HTMLElement;
         if (target.closest("button, input, select, label")) return;
-        onSelect(track.id);
+        const headerEl = target.closest(".mixsmvrt-track-header");
+        const waveformEl = target.closest(".mixsmvrt-track-waveform");
+
+        if (headerEl) {
+          onSelect(track.id);
+          if (onSelectAudio) onSelectAudio(null);
+        } else if (waveformEl) {
+          onSelect(track.id);
+          if (onSelectAudio) onSelectAudio(track.id);
+        } else {
+          onSelect(track.id);
+        }
       }}
       onContextMenu={(event) => {
         event.preventDefault();
+        const target = event.target as HTMLElement;
+        const waveformEl = target.closest(".mixsmvrt-track-waveform");
+
         onSelect(track.id);
+        if (waveformEl && onSelectAudio) {
+          onSelectAudio(track.id);
+        }
         setIsContextMenuOpen(true);
         setContextMenuPos({ x: event.clientX, y: event.clientY });
       }}
     >
       {/* Track Header */}
-      <div className="flex w-60 flex-col justify-between border-r border-white/10 bg-zinc-900/90 p-3 text-xs">
+      <div className="mixsmvrt-track-header flex w-60 flex-col justify-between border-r border-white/10 bg-zinc-900/90 p-3 text-xs">
         <div className="flex items-center justify-between gap-2">
           {isEditingName ? (
             <input
@@ -654,7 +677,7 @@ export default function TrackLane({
 
       {/* Waveform / Drop area with grid */}
       <div
-        className={`relative flex flex-1 items-center overflow-hidden border-l bg-zinc-950/95 ${
+        className={`mixsmvrt-track-waveform relative flex flex-1 items-center overflow-hidden border-l bg-zinc-950/95 ${
           isDragging ? "ring-1 ring-red-500/80" : ""
         } ${
           track.file
@@ -776,7 +799,7 @@ export default function TrackLane({
           ref={containerRef}
             className={`relative z-10 h-[72px] w-full overflow-hidden transform transition-transform duration-300 ${
               track.processed ? "scale-y-110" : "scale-y-100"
-            }`}
+            } ${isAudioSelected ? "ring-2 ring-red-400/80" : ""}`}
             style={{ transformOrigin: "center center" }}
         />
       </div>
@@ -814,6 +837,20 @@ export default function TrackLane({
             <span>Duplicate Track</span>
             <span className="text-[10px] uppercase text-white/50">Alt+D</span>
           </button>
+          {track.file && onClearAudio && (
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-1.5 text-left text-amber-300 hover:bg-amber-900/60"
+              onClick={() => {
+                setIsContextMenuOpen(false);
+                setContextMenuPos(null);
+                onClearAudio(track.id);
+              }}
+            >
+              <span>Remove Audio (Keep Track)</span>
+              <span className="text-[10px] uppercase text-amber-200/80">Del</span>
+            </button>
+          )}
           <button
             type="button"
             className="flex w-full items-center justify-between px-3 py-1.5 text-left text-red-400 hover:bg-red-900/70"
