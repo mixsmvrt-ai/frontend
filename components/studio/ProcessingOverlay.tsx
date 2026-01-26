@@ -21,6 +21,51 @@ export const PROCESSING_STAGES: ProcessingStage[] = [
   { id: "finalize", label: "Finalizing output" },
 ];
 
+// Frontend-side templates that mirror the backend FLOW_STEP_TEMPLATES
+// in backend/main.py. These are used to customize the overlay per
+// flow even before the backend has returned a job status payload.
+export const FLOW_PROCESSING_STAGE_TEMPLATES: Record<string, ProcessingStage[]> = {
+  audio_cleanup: [
+    { id: "Analyzing audio", label: "Analyzing audio" },
+    { id: "Noise reduction", label: "Noise reduction" },
+    { id: "Artifact cleanup", label: "Artifact cleanup" },
+    { id: "EQ cleanup", label: "EQ cleanup" },
+    { id: "Output rendering", label: "Output rendering" },
+  ],
+  mixing_only: [
+    { id: "Analyzing audio", label: "Analyzing audio" },
+    { id: "Gain staging", label: "Gain staging" },
+    { id: "Applying EQ", label: "Applying EQ" },
+    { id: "Applying compression", label: "Applying compression" },
+    { id: "Adding saturation", label: "Adding saturation" },
+    { id: "Stereo enhancement", label: "Stereo enhancement" },
+    { id: "Mix render", label: "Mix render" },
+  ],
+  mix_master: [
+    { id: "Analyzing audio", label: "Analyzing audio" },
+    { id: "Detecting vocal characteristics", label: "Detecting vocal characteristics" },
+    { id: "Cleaning noise & artifacts", label: "Cleaning noise & artifacts" },
+    { id: "Gain staging", label: "Gain staging" },
+    { id: "Applying EQ", label: "Applying EQ" },
+    { id: "Applying compression", label: "Applying compression" },
+    { id: "De-essing", label: "De-essing" },
+    { id: "Adding saturation", label: "Adding saturation" },
+    { id: "Stereo enhancement", label: "Stereo enhancement" },
+    { id: "Bus processing", label: "Bus processing" },
+    { id: "Loudness normalization", label: "Loudness normalization" },
+    { id: "Finalizing output", label: "Finalizing output" },
+  ],
+  mastering_only: [
+    { id: "Analyzing mix", label: "Analyzing mix" },
+    { id: "Linear EQ", label: "Linear EQ" },
+    { id: "Multiband compression", label: "Multiband compression" },
+    { id: "Stereo imaging", label: "Stereo imaging" },
+    { id: "Limiting", label: "Limiting" },
+    { id: "Loudness normalization", label: "Loudness normalization" },
+    { id: "Final render", label: "Final render" },
+  ],
+};
+
 export type TrackProcessingState = "idle" | "processing" | "completed" | "failed";
 
 export interface TrackProcessingStatus {
