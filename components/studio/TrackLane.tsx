@@ -156,6 +156,8 @@ export default function TrackLane({
 
     const ws = WaveSurfer.create({
       container: containerRef.current,
+      // Force WebAudio backend so filters (including pan) affect audible output
+      backend: "WebAudio",
       waveColor: "rgba(248, 250, 252, 0.3)",
       progressColor: "#ef4444",
       cursorColor: "#e5e7eb",
@@ -478,6 +480,22 @@ export default function TrackLane({
   const volumePercent = Math.round(track.volume * 100);
   const panPercent = Math.round(panValue * 100);
 
+  const handleVolumePercentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = Number(event.target.value);
+    if (!Number.isFinite(raw)) return;
+    const clamped = Math.max(0, Math.min(100, raw));
+    const asUnit = clamped / 100;
+    onVolumeChange(track.id, asUnit);
+  };
+
+  const handlePanPercentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = Number(event.target.value);
+    if (!Number.isFinite(raw)) return;
+    const clamped = Math.max(-100, Math.min(100, raw));
+    const asUnit = clamped / 100;
+    onPanChange(track.id, asUnit);
+  };
+
   return (
     <div
       className={`relative flex border-b bg-black/40 transition-colors ${
@@ -621,9 +639,14 @@ export default function TrackLane({
                   onChange={handleVolumeInput}
                   className="h-2 w-full cursor-pointer accent-red-500"
                 />
-                <span className="w-10 text-right text-[9px] text-white/50">
-                  {volumePercent}%
-                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={Number.isFinite(volumePercent) ? volumePercent : 0}
+                  onChange={handleVolumePercentChange}
+                  className="w-12 rounded bg-zinc-800 px-1 py-0.5 text-right text-[9px] text-white/70 outline-none focus:ring-1 focus:ring-red-500/60"
+                />
               </div>
             </label>
             <label className="flex items-center gap-3 text-[10px] text-white/60">
@@ -647,13 +670,14 @@ export default function TrackLane({
                       : "R"
                     : "C"}
                 </span>
-                <span className="w-10 text-right text-[9px] text-white/50">
-                  {panPercent > 0
-                    ? `${panPercent}%`
-                    : panPercent < 0
-                    ? `${panPercent}%`
-                    : "0%"}
-                </span>
+                <input
+                  type="number"
+                  min={-100}
+                  max={100}
+                  value={Number.isFinite(panPercent) ? panPercent : 0}
+                  onChange={handlePanPercentChange}
+                  className="w-14 rounded bg-zinc-800 px-1 py-0.5 text-right text-[9px] text-white/70 outline-none focus:ring-1 focus:ring-red-500/60"
+                />
               </div>
             </label>
           </div>
