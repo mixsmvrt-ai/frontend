@@ -277,6 +277,7 @@ export default function MixStudio() {
   });
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
+  const processingCancelRef = useRef<boolean>(false);
 
   const backendJobStatus = useBackendJobStatus(activeJobId);
 
@@ -768,6 +769,9 @@ export default function MixStudio() {
     if (isProcessing) return;
     if (!tracks.some((track) => track.file)) return;
 
+    // Reset any previous cancellation signal.
+    processingCancelRef.current = false;
+
     setIsProcessing(true);
     setHasMixed(false);
 
@@ -860,6 +864,10 @@ export default function MixStudio() {
 
       // Process each track that has audio through the AI DSP service
       for (let index = 0; index < playable.length; index += 1) {
+        if (processingCancelRef.current) {
+          break;
+        }
+
         const track = playable[index];
         // Show a small non-zero progress value while the first track is running
         const baseProgress = (index / playable.length) * 100;
@@ -896,7 +904,7 @@ export default function MixStudio() {
 
         // eslint-disable-next-line no-await-in-loop
         const processed = await processTrackWithAI(track);
-        if (processed) {
+        if (processed && !processingCancelRef.current) {
           updates.set(track.id, processed);
           anyUpdated = true;
 
@@ -934,7 +942,7 @@ export default function MixStudio() {
         }
       }
 
-      if (updates.size > 0) {
+      if (!processingCancelRef.current && updates.size > 0) {
         setTracks((prev) =>
           prev.map((track) =>
             updates.has(track.id)
@@ -949,8 +957,8 @@ export default function MixStudio() {
           ),
         );
       }
-      setHasMixed(anyUpdated);
-      if (anyUpdated) {
+      setHasMixed(!processingCancelRef.current && anyUpdated);
+      if (!processingCancelRef.current && anyUpdated) {
         setProcessingOverlay((prev): ProcessingOverlayState | null =>
           prev
             ? {
@@ -987,6 +995,9 @@ export default function MixStudio() {
     if (isProcessing) return;
     if (!selectedTrackId) return;
 
+    // Reset any previous cancellation signal.
+    processingCancelRef.current = false;
+
     const target = tracks.find((track) => track.id === selectedTrackId);
     if (!target || !target.file) return;
 
@@ -1020,7 +1031,7 @@ export default function MixStudio() {
     setIsProcessing(true);
     try {
       const processed = await processTrackWithAI(target);
-      if (processed) {
+      if (processed && !processingCancelRef.current) {
         setTracks((prev) =>
           prev.map((track) =>
             track.id === selectedTrackId
@@ -1212,6 +1223,10 @@ export default function MixStudio() {
   const hasBeatTrack = tracks.some((track) => track.role === "beat" && track.file);
 
   const handleCancelProcessingOverlay = () => {
+    // Signal any in-flight processing loops to stop and avoid
+    // committing processed audio back into the tracks state.
+    processingCancelRef.current = true;
+    setIsProcessing(false);
     setProcessingOverlay(null);
     setActiveJobId(null);
     setOverlayStages(undefined);
