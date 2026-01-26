@@ -5,6 +5,8 @@ import React from "react";
 export type PresetMode = "audio_cleanup" | "mixing_only" | "mix_and_master" | "mastering_only";
 export type PresetTarget = "vocal" | "beat" | "full_mix";
 
+export type ThrowFxMode = "off" | "reverb" | "delay" | "both";
+
 export type StudioPresetMeta = {
   id: string;
   name: string;
@@ -22,6 +24,9 @@ interface PresetSelectorProps {
   selectedPresetId: string | null;
   onChange: (presetId: string) => void;
   hasBeatTrack: boolean;
+  showThrowFxControls?: boolean;
+  throwFxMode?: ThrowFxMode;
+  onThrowFxModeChange?: (mode: ThrowFxMode) => void;
 }
 
 export function PresetSelector({
@@ -30,6 +35,9 @@ export function PresetSelector({
   selectedPresetId,
   onChange,
   hasBeatTrack,
+  showThrowFxControls,
+  throwFxMode = "off",
+  onThrowFxModeChange,
 }: PresetSelectorProps) {
   if (!presets.length) return null;
 
@@ -84,6 +92,41 @@ export function PresetSelector({
       </div>
       {warningText && (
         <p className="mt-1 text-[10px] text-amber-300/80">{warningText}</p>
+      )}
+      {showThrowFxControls && onThrowFxModeChange && (
+        <div className="mt-2 flex flex-col gap-1.5 border-t border-white/10 pt-1.5">
+          <div className="flex items-center justify-between text-[10px] text-white/50">
+            <span className="uppercase tracking-[0.16em]">Throw FX</span>
+            <span className="text-white/40">Fill vocal gaps creatively</span>
+          </div>
+          <div className="inline-flex rounded-full bg-white/5 p-0.5 text-[10px]">
+            {["reverb", "delay", "both"].map((mode) => {
+              const isActive = throwFxMode === mode;
+              const label =
+                mode === "reverb"
+                  ? "Reverb Throw"
+                  : mode === "delay"
+                    ? "Delay Throw"
+                    : "Both";
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() =>
+                    onThrowFxModeChange(isActive ? "off" : (mode as ThrowFxMode))
+                  }
+                  className={`mx-0.5 rounded-full px-2.5 py-1 transition ${
+                    isActive
+                      ? "bg-red-500 text-black shadow-neon-soft"
+                      : "text-white/70 hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
