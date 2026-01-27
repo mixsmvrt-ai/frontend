@@ -323,40 +323,40 @@ export default function Dashboard() {
 													className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] ${
 														project.status === "completed" || project.status === "Ready"
 															? "bg-emerald-500/15 text-emerald-300"
-															: "bg-amber-400/10 text-amber-300"
+														: "bg-amber-400/10 text-amber-300"
 													}`}
 												>
 													{project.status ? project.status : "Draft"}
 												</span>
 											</td>
 											<td className="px-3 py-2">{formatRelativeTime(project.updated_at)}</td>
+											<td className="px-2 py-2 text-right">
+												<button
+													type="button"
+													onClick={(event) => handleDeleteProject(event, project.id)}
+													disabled={deletingProjectId === project.id}
+													className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[13px] text-brand-muted hover:bg-red-600/20 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+													aria-label="Delete project"
+												>
+													<span aria-hidden="true">🗑</span>
+												</button>
+											</td>
 										</tr>
 									))}
 									{recentProjects.length === 0 && !isLoadingProjects && (
-									<td className="px-3 py-2">{formatRelativeTime(project.updated_at)}</td>
-									<td className="px-2 py-2 text-right">
-										<button
-											type="button"
-											onClick={(event) => handleDeleteProject(event, project.id)}
-											disabled={deletingProjectId === project.id}
-											className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[13px] text-brand-muted hover:bg-red-600/20 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
-											aria-label="Delete project"
-										>
-											<span aria-hidden="true">🗑</span>
-										</button>
-									</td>
-											<td className="px-3 py-3" colSpan={4}>
+										<tr className="border-t border-white/5 text-[11px] text-brand-muted">
+											<td className="px-3 py-3" colSpan={5}>
 												No projects yet – start a new one above.
 											</td>
 										</tr>
-										<td className="px-3 py-3" colSpan={5}>
+									)}
 									{isLoadingProjects && (
 										<tr className="border-t border-white/5 text-[11px] text-brand-muted">
-											<td className="px-3 py-3" colSpan={4}>
+											<td className="px-3 py-3" colSpan={5}>
 												Loading your projects…
 											</td>
 										</tr>
-										<td className="px-3 py-3" colSpan={5}>
+									)}
 								</tbody>
 							</table>
 						</div>
