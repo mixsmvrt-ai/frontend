@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -62,6 +63,15 @@ function formatFlowLabel(flowKey: string): string {
 	return "Session";
 }
 
+function flowParamFromFlowKey(flowKey: string): string {
+	if (flowKey === "audio_cleanup") return "cleanup";
+	if (flowKey === "mixing_only") return "mix-only";
+	if (flowKey === "mix_master") return "mix-master";
+	if (flowKey === "mastering_only") return "master-only";
+	if (flowKey === "podcast") return "podcast";
+	return "mix-master";
+}
+
 function formatRelativeTime(timestamp: string | null): string {
 	if (!timestamp) return "Just now";
 	const date = new Date(timestamp);
@@ -103,6 +113,7 @@ export default function Dashboard() {
 	const [newProjectName, setNewProjectName] = useState("");
 	const [newProjectFlowId, setNewProjectFlowId] = useState<string>("mix-master");
 	const [isCreatingProject, setIsCreatingProject] = useState(false);
+	const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!isSupabaseConfigured || !supabase) return;
@@ -141,6 +152,11 @@ export default function Dashboard() {
 		() => quickActions.find((action) => action.id === newProjectFlowId) || quickActions[2],
 		[newProjectFlowId],
 	);
+
+	const handleOpenProject = (project: ProjectRow) => {
+		const flowParam = flowParamFromFlowKey(project.flow_key);
+		router.push(`/studio?flow=${flowParam}&project_id=${project.id}`);
+	};
 
 	const handleCreateProject = async () => {
 		if (!isSupabaseConfigured || !supabase) {
@@ -192,6 +208,31 @@ export default function Dashboard() {
 			router.push(`/studio?flow=${newProjectFlowId}&project_id=${data.id}`);
 		} finally {
 			setIsCreatingProject(false);
+		}
+	};
+
+	const handleDeleteProject = async (
+		event: React.MouseEvent<HTMLButtonElement>,
+		projectId: string,
+	) => {
+		event.stopPropagation();
+
+		if (!isSupabaseConfigured || !supabase) return;
+		// eslint-disable-next-line no-alert
+		const confirmed = window.confirm("Delete this project? This can’t be undone.");
+		if (!confirmed) return;
+
+		setDeletingProjectId(projectId);
+		try {
+			const { error } = await supabase.from("projects").delete().eq("id", projectId);
+			if (error) {
+				// eslint-disable-next-line no-console
+				console.error("Error deleting project", error.message);
+				return;
+			}
+			setProjects((prev) => prev.filter((project) => project.id !== projectId));
+		} finally {
+			setDeletingProjectId(null);
 		}
 	};
 
@@ -266,11 +307,16 @@ export default function Dashboard() {
 										<th className="px-3 py-2 font-medium">Type</th>
 										<th className="px-3 py-2 font-medium">Status</th>
 										<th className="px-3 py-2 font-medium">Updated</th>
+										<th className="px-2 py-2 font-medium text-right" aria-label="Actions" />
 									</tr>
 								</thead>
 								<tbody>
 									{recentProjects.map((project) => (
-										<tr key={project.id} className="border-t border-white/5 text-[11px] text-brand-muted">
+										<tr
+											key={project.id}
+											className="border-t border-white/5 text-[11px] text-brand-muted hover:bg-white/5 cursor-pointer"
+											onClick={() => handleOpenProject(project)}
+										>
 											<td className="px-3 py-2 text-brand-text">{project.name}</td>
 											<td className="px-3 py-2">{formatFlowLabel(project.flow_key)}</td>
 											<td className="px-3 py-2">
@@ -288,19 +334,30 @@ export default function Dashboard() {
 										</tr>
 									))}
 									{recentProjects.length === 0 && !isLoadingProjects && (
-										<tr className="border-t border-white/5 text-[11px] text-brand-muted">
+									<td className="px-3 py-2">{formatRelativeTime(project.updated_at)}</td>
+									<td className="px-2 py-2 text-right">
+										<button
+											type="button"
+											onClick={(event) => handleDeleteProject(event, project.id)}
+											disabled={deletingProjectId === project.id}
+											className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[13px] text-brand-muted hover:bg-red-600/20 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+											aria-label="Delete project"
+										>
+											<span aria-hidden="true">🗑</span>
+										</button>
+									</td>
 											<td className="px-3 py-3" colSpan={4}>
 												No projects yet – start a new one above.
 											</td>
 										</tr>
-									)}
+										<td className="px-3 py-3" colSpan={5}>
 									{isLoadingProjects && (
 										<tr className="border-t border-white/5 text-[11px] text-brand-muted">
 											<td className="px-3 py-3" colSpan={4}>
 												Loading your projects…
 											</td>
 										</tr>
-									)}
+										<td className="px-3 py-3" colSpan={5}>
 								</tbody>
 							</table>
 						</div>
