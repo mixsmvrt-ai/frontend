@@ -52,8 +52,15 @@ type FeatureType =
   | "mix_master"
   | "mastering_only";
 
+type StudioSnapshot = {
+  tracks: TrackType[];
+  hasMixed: boolean;
+  isMastering: boolean;
+};
+
 const DSP_URL = process.env.NEXT_PUBLIC_DSP_URL || "http://localhost:8001";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+const MAX_HISTORY = 20;
 
 function featureTypeForMode(mode: StudioMode): FeatureType | null {
   if (mode === "cleanup") return "audio_cleanup";
@@ -295,6 +302,32 @@ export default function MixStudio() {
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
   const processingCancelRef = useRef<boolean>(false);
+  const [undoStack, setUndoStack] = useState<StudioSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<StudioSnapshot[]>([]);
+
+  const createSnapshot = (): StudioSnapshot => ({
+    tracks: tracks.map((track) => ({ ...track })),
+    hasMixed,
+    isMastering,
+  });
+
+  const applySnapshot = (snapshot: StudioSnapshot) => {
+    setTracks(snapshot.tracks.map((track) => ({ ...track })));
+    setHasMixed(snapshot.hasMixed);
+    setIsMastering(snapshot.isMastering);
+  };
+
+  const pushUndoSnapshot = () => {
+    const snapshot = createSnapshot();
+    setUndoStack((prev) => {
+      const next = [...prev, snapshot];
+      if (next.length > MAX_HISTORY) {
+        return next.slice(next.length - MAX_HISTORY);
+      }
+      return next;
+    });
+    setRedoStack([]);
+  };
 
   const backendJobStatus = useBackendJobStatus(activeJobId);
 
@@ -914,6 +947,9 @@ export default function MixStudio() {
     if (isProcessing) return;
     if (!tracks.some((track) => track.file)) return;
 
+    // Capture the current mix so it can be restored via Undo.
+    pushUndoSnapshot();
+
     // Reset any previous cancellation signal.
     processingCancelRef.current = false;
 
@@ -1291,6 +1327,31 @@ export default function MixStudio() {
   const isPrimaryFeatureLocked =
     featureForMode != null && !userFeatureAccess[featureForMode] && !isAdmin;
 
+  const canUndo = undoStack.length > 0 && !isProcessing;
+  const canRedo = redoStack.length > 0 && !isProcessing;
+
+  const handleUndo = () => {
+    if (!canUndo) return;
+    const previous = undoStack[undoStack.length - 1];
+    const remaining = undoStack.slice(0, -1);
+
+    const current: StudioSnapshot = createSnapshot();
+    setUndoStack(remaining);
+    setRedoStack((prev) => [...prev, current]);
+    applySnapshot(previous);
+  };
+
+  const handleRedo = () => {
+    if (!canRedo) return;
+    const nextSnapshot = redoStack[redoStack.length - 1];
+    const remaining = redoStack.slice(0, -1);
+
+    const current: StudioSnapshot = createSnapshot();
+    setRedoStack(remaining);
+    setUndoStack((prev) => [...prev, current]);
+    applySnapshot(nextSnapshot);
+  };
+
   let primaryActionLabel: string;
   if (isCleanupMode) {
     primaryActionLabel = isProcessing ? "Cleaning..." : "Run Cleanup";
@@ -1451,6 +1512,26 @@ export default function MixStudio() {
             </div>
 
             <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  disabled={!canUndo}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 text-[11px] text-white/70 hover:border-white/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Undo last processing"
+                >
+                  ⟲
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRedo}
+                  disabled={!canRedo}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 text-[11px] text-white/70 hover:border-white/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Redo processing"
+                >
+                  ⟳
+                </button>
+              </div>
               <div className="flex items-center gap-1 text-[11px] text-white/60">
                 <span>Autosave</span>
                 <select
