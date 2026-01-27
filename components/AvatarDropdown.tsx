@@ -2,18 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 import { useStudioFlowModal } from "./StudioFlowModal";
-
-type ProjectRow = {
-  id: string;
-  name: string;
-  flow_key: string;
-  status: string | null;
-  updated_at: string | null;
-};
 
 type AvatarDropdownProps = {
   user: User;
@@ -21,57 +11,25 @@ type AvatarDropdownProps = {
 };
 
 export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const firstItemRef = useRef<HTMLButtonElement | null>(null);
-  const [projects, setProjects] = useState<ProjectRow[]>([]);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
   const email = user.email ?? "";
   const metadata = (user.user_metadata || {}) as Record<string, unknown>;
   const avatarUrl = (metadata.avatar_url as string) || "";
   const displayName =
     (metadata.full_name as string) || email || (metadata.username as string) || "Artist";
+  const planLabel = (metadata.plan as string) || "Free";
 
-  const initials = displayName
-    .split(/[^A-Za-z0-9]+/)
-    .filter(Boolean)
-
-  const formatFlowLabel = (flowKey: string): string => {
-    if (flowKey === "audio_cleanup") return "Audio Cleanup";
-    if (flowKey === "mixing_only") return "Mixing Only";
-    if (flowKey === "mix_master") return "Mix + Master";
-    if (flowKey === "mastering_only") return "Mastering";
-    if (flowKey === "podcast") return "Podcast";
-    return "Session";
-  };
-
-  const flowParamFromFlowKey = (flowKey: string): string => {
-    if (flowKey === "audio_cleanup") return "cleanup";
-    if (flowKey === "mixing_only") return "mix-only";
-    if (flowKey === "mix_master") return "mix-master";
-    if (flowKey === "mastering_only") return "master-only";
-    if (flowKey === "podcast") return "podcast";
-    return "mix-master";
-  };
-
-  const formatRelativeTime = (timestamp: string | null): string => {
-    if (!timestamp) return "Just now";
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return "Just now";
-
-    const diffMs = Date.now() - date.getTime();
-    const diffMinutes = Math.floor(diffMs / 60000);
-    if (diffMinutes < 1) return "Just now";
-    if (diffMinutes < 60) return `${diffMinutes} min ago`;
-    const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `${diffHours} hr${diffHours === 1 ? "" : "s"} ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
-  };
+  const initials =
+    displayName
+      .split(/[^A-Za-z0-9]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "MM";
 
   useEffect(() => {
     if (!open) return;
@@ -112,41 +70,6 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
 
   const { open: openStudioModal } = useStudioFlowModal();
 
-  useEffect(() => {
-    if (!open) return;
-    if (!isSupabaseConfigured || !supabase) return;
-
-    let isMounted = true;
-    const loadProjects = async () => {
-      try {
-        setIsLoadingProjects(true);
-        const { data, error } = await supabase
-          .from("projects")
-          .select("id, name, flow_key, status, updated_at")
-          .eq("user_id", user.id)
-          .order("updated_at", { ascending: false })
-          .limit(6);
-
-        if (!isMounted) return;
-        if (error) {
-          // eslint-disable-next-line no-console
-          console.error("Error loading projects in avatar menu", error.message);
-          setProjects([]);
-          return;
-        }
-        setProjects(data || []);
-      } finally {
-        if (isMounted) setIsLoadingProjects(false);
-      }
-    };
-
-    void loadProjects();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [open, user.id]);
-
   const handleToggle = () => {
     setOpen((value) => !value);
   };
@@ -167,34 +90,6 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
       setOpen(false);
       if (callback) callback();
     };
-  };
-
-  const handleOpenProject = (project: ProjectRow) => {
-    const flowParam = flowParamFromFlowKey(project.flow_key);
-    setOpen(false);
-    router.push(`/studio?flow=${flowParam}&project_id=${project.id}`);
-  };
-
-  const handleDeleteProject = async (event: any, projectId: string) => {
-    event.stopPropagation();
-
-    if (!isSupabaseConfigured || !supabase) return;
-    // eslint-disable-next-line no-alert
-    const confirmed = window.confirm("Delete this project? This can’t be undone.");
-    if (!confirmed) return;
-
-    setDeletingProjectId(projectId);
-    try {
-      const { error } = await supabase.from("projects").delete().eq("id", projectId);
-      if (error) {
-        // eslint-disable-next-line no-console
-        console.error("Error deleting project from avatar menu", error.message);
-        return;
-      }
-      setProjects((prev) => prev.filter((project) => project.id !== projectId));
-    } finally {
-      setDeletingProjectId(null);
-    }
   };
 
   return (
