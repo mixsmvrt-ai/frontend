@@ -187,6 +187,7 @@ export default function MixStudio() {
     mix_master: false,
     mastering_only: false,
   });
+  const [isAdmin, setIsAdmin] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState<FeatureType | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -211,6 +212,10 @@ export default function MixStudio() {
         if (!data.session) {
           router.replace("/login");
           return;
+        }
+        const email = data.session.user?.email;
+        if (email && email.toLowerCase() === "mixsmvrt@gmail.com") {
+          setIsAdmin(true);
         }
         // In a future iteration, this can call a dedicated backend
         // entitlement endpoint. For now, default to all features locked
@@ -1381,6 +1386,8 @@ export default function MixStudio() {
         : isMasterOnlyMode
           ? "mastering_only"
           : null;
+  const isPrimaryFeatureLocked =
+    featureForMode != null && !userFeatureAccess[featureForMode] && !isAdmin;
 
   let primaryActionLabel: string;
   if (isCleanupMode) {
@@ -1800,7 +1807,13 @@ export default function MixStudio() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={handleProcessSelectedTrack}
+                onClick={() => {
+                  if (featureForMode && !isAdmin && !userFeatureAccess[featureForMode]) {
+                    setShowUpgradeModal(featureForMode);
+                    return;
+                  }
+                  void handleProcessSelectedTrack();
+                }}
                 disabled={
                   isProcessing ||
                   !selectedTrackId ||
@@ -1808,6 +1821,11 @@ export default function MixStudio() {
                 }
                 className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 transition-colors disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40 hover:bg-zinc-700"
               >
+                {featureForMode && !isAdmin && !userFeatureAccess[featureForMode] && (
+                  <span aria-hidden="true" className="mr-1">
+                    🔒
+                  </span>
+                )}
                 Process Selected Track
               </button>
 
@@ -1889,21 +1907,21 @@ export default function MixStudio() {
               </div>
               <button
                 type="button"
-                disabled={isProcessing}
+                disabled={isProcessing || isPrimaryFeatureLocked}
                 onClick={() => {
-                  if (featureForMode && !userFeatureAccess[featureForMode]) {
+                  if (isPrimaryFeatureLocked) {
                     setShowUpgradeModal(featureForMode);
                     return;
                   }
-                  void handleProcessSelectedTrack();
+                  void handleProcessFullMix();
                 }}
                 className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-                  featureForMode && !userFeatureAccess[featureForMode]
+                  isPrimaryFeatureLocked
                     ? "border border-white/15 bg-transparent text-white/70"
                     : "bg-brand-primary text-white shadow-[0_0_30px_rgba(225,6,0,0.9)] hover:bg-[#ff291e]"
                 }`}
               >
-                {featureForMode && !userFeatureAccess[featureForMode] && (
+                {isPrimaryFeatureLocked && (
                   <span aria-hidden="true">🔒</span>
                 )}
                 <span>{primaryActionLabel}</span>
