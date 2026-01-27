@@ -2,8 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
+import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 import { useStudioFlowModal } from "./StudioFlowModal";
+
+type ProjectRow = {
+  id: string;
+  name: string;
+  flow_key: string;
+  status: string | null;
+  updated_at: string | null;
+};
 
 type AvatarDropdownProps = {
   user: User;
@@ -11,10 +21,14 @@ type AvatarDropdownProps = {
 };
 
 export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const firstItemRef = useRef<HTMLButtonElement | null>(null);
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
   const email = user.email ?? "";
   const metadata = (user.user_metadata || {}) as Record<string, unknown>;
@@ -29,6 +43,39 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "MM";
+
+  const formatFlowLabel = (flowKey: string): string => {
+    if (flowKey === "audio_cleanup") return "Audio Cleanup";
+    if (flowKey === "mixing_only") return "Mixing Only";
+    if (flowKey === "mix_master") return "Mix + Master";
+    if (flowKey === "mastering_only") return "Mastering";
+    if (flowKey === "podcast") return "Podcast";
+    return "Session";
+  };
+
+  const flowParamFromFlowKey = (flowKey: string): string => {
+    if (flowKey === "audio_cleanup") return "cleanup";
+    if (flowKey === "mixing_only") return "mix-only";
+    if (flowKey === "mix_master") return "mix-master";
+    if (flowKey === "mastering_only") return "master-only";
+    if (flowKey === "podcast") return "podcast";
+    return "mix-master";
+  };
+
+  const formatRelativeTime = (timestamp: string | null): string => {
+    if (!timestamp) return "Just now";
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return "Just now";
+
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes < 1) return "Just now";
+    if (diffMinutes < 60) return `${diffMinutes} min ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} hr${diffHours === 1 ? "" : "s"} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -69,6 +116,41 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
 
   const { open: openStudioModal } = useStudioFlowModal();
 
+  useEffect(() => {
+    if (!open) return;
+    if (!isSupabaseConfigured || !supabase) return;
+
+    let isMounted = true;
+    const loadProjects = async () => {
+      try {
+        setIsLoadingProjects(true);
+        const { data, error } = await supabase
+          .from("projects")
+          .select("id, name, flow_key, status, updated_at")
+          .eq("user_id", user.id)
+          .order("updated_at", { ascending: false })
+          .limit(6);
+
+        if (!isMounted) return;
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error("Error loading projects in avatar menu", error.message);
+          setProjects([]);
+          return;
+        }
+        setProjects(data || []);
+      } finally {
+        if (isMounted) setIsLoadingProjects(false);
+      }
+    };
+
+    void loadProjects();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, user.id]);
+
   const handleToggle = () => {
     setOpen((value) => !value);
   };
@@ -89,6 +171,34 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
       setOpen(false);
       if (callback) callback();
     };
+  };
+
+  const handleOpenProject = (project: ProjectRow) => {
+    const flowParam = flowParamFromFlowKey(project.flow_key);
+    setOpen(false);
+    router.push(`/studio?flow=${flowParam}&project_id=${project.id}`);
+  };
+
+  const handleDeleteProject = async (event: any, projectId: string) => {
+    event.stopPropagation();
+
+    if (!isSupabaseConfigured || !supabase) return;
+    // eslint-disable-next-line no-alert
+    const confirmed = window.confirm("Delete this project? This can’t be undone.");
+    if (!confirmed) return;
+
+    setDeletingProjectId(projectId);
+    try {
+      const { error } = await supabase.from("projects").delete().eq("id", projectId);
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error("Error deleting project from avatar menu", error.message);
+        return;
+      }
+      setProjects((prev) => prev.filter((project) => project.id !== projectId));
+    } finally {
+      setDeletingProjectId(null);
+    }
   };
 
   return (
@@ -164,14 +274,54 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
               <span>Studio</span>
               <span className="text-[10px] text-white/40">⌘S</span>
             </Link>
-            <Link
-              href="/projects"
-              role="menuitem"
-              onClick={handleMenuItemClick()}
-              className="block rounded-lg px-2 py-1.5 text-[12px] text-white/80 transition hover:bg-white/5"
-            >
-              My Projects
-            </Link>
+            <div className="mt-1 rounded-lg bg-white/3 px-2 py-1.5">
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                  My Projects
+                </p>
+                <Link
+                  href="/dashboard"
+                  onClick={handleMenuItemClick()}
+                  className="text-[10px] text-white/50 hover:text-white/80"
+                >
+                  View all
+                </Link>
+              </div>
+              <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
+                {projects.map((project) => (
+                  <button
+                    key={project.id}
+                    type="button"
+                    onClick={() => handleOpenProject(project)}
+                    className="flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-[11px] text-white/80 hover:bg-white/10"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-white">{project.name}</p>
+                      <p className="mt-0.5 truncate text-[10px] text-white/50">
+                        {formatFlowLabel(project.flow_key)} • {formatRelativeTime(project.updated_at)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(event) => handleDeleteProject(event, project.id)}
+                      disabled={deletingProjectId === project.id}
+                      className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] text-white/50 hover:bg-red-500/20 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label="Delete project"
+                    >
+                      🗑
+                    </button>
+                  </button>
+                ))}
+                {projects.length === 0 && !isLoadingProjects && (
+                  <p className="px-1 py-1 text-[10px] text-white/40">
+                    No projects yet.
+                  </p>
+                )}
+                {isLoadingProjects && (
+                  <p className="px-1 py-1 text-[10px] text-white/50">Loading…</p>
+                )}
+              </div>
+            </div>
             <Link
               href="/presets"
               role="menuitem"
