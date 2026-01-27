@@ -1,6 +1,5 @@
 "use client";
 
-import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -212,7 +211,7 @@ export default function Dashboard() {
 	};
 
 	const handleDeleteProject = async (
-		event: React.MouseEvent<HTMLButtonElement>,
+		event: any,
 		projectId: string,
 	) => {
 		event.stopPropagation();
