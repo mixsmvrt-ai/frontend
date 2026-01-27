@@ -992,13 +992,11 @@ export default function MixStudio() {
         // eslint-disable-next-line no-console
         console.error("Failed to create backend processing job", await res.text());
         setActiveJobId(null);
-        setOverlayStages(undefined);
       }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Error creating backend processing job", error);
       setActiveJobId(null);
-      setOverlayStages(undefined);
     }
 
     try {
