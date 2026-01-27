@@ -1134,93 +1134,6 @@ export default function MixStudio() {
     }
   };
 
-  const handleProcessSelectedTrack = async () => {
-    if (isProcessing) return;
-    if (!selectedTrackId) return;
-
-    // Reset any previous cancellation signal.
-    processingCancelRef.current = false;
-
-    const target = tracks.find((track) => track.id === selectedTrackId);
-    if (!target || !target.file) return;
-
-    const featureType = featureTypeForMode(studioMode) ?? "mix_master";
-    const flowStages =
-      FLOW_PROCESSING_STAGE_TEMPLATES[featureType] &&
-      FLOW_PROCESSING_STAGE_TEMPLATES[featureType].length
-        ? FLOW_PROCESSING_STAGE_TEMPLATES[featureType]
-        : PROCESSING_STAGES;
-    const initialStageId = (flowStages[0] ?? PROCESSING_STAGES[0]).id;
-
-    const trackStatus: TrackProcessingStatus = {
-      id: target.id,
-      name: target.name || target.id,
-      state: "processing",
-      percentage: 0,
-    };
-
-    setProcessingOverlay({
-      active: true,
-      mode: "track",
-      percentage: 0,
-      currentStageId: initialStageId,
-      completedStageIds: [],
-      tracks: [trackStatus],
-      error: null,
-    });
-
-    setOverlayStages(flowStages);
-
-    setIsProcessing(true);
-    try {
-      const processed = await processTrackWithAI(target);
-      if (processed && !processingCancelRef.current) {
-        setTracks((prev) =>
-          prev.map((track) =>
-            track.id === selectedTrackId
-              ? {
-                  ...track,
-                  file: processed,
-                  processed: true,
-                }
-              : track,
-          ),
-        );
-      }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error("Error processing selected track with AI", error);
-      setProcessingOverlay((prev) =>
-        prev
-          ? {
-              ...prev,
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Something went wrong while processing this track.",
-            }
-          : prev,
-      );
-    } finally {
-      setIsProcessing(false);
-      setProcessingOverlay((prev) =>
-        prev
-          ? {
-              ...prev,
-              active: false,
-              percentage: prev.error ? prev.percentage : 100,
-              currentStageId: prev.error
-                ? prev.currentStageId
-                : (flowStages[flowStages.length - 1] ?? flowStages[0]).id,
-              completedStageIds: prev.error
-                ? prev.completedStageIds
-                : flowStages.map((s) => s.id),
-            }
-          : prev,
-      );
-    }
-  };
-
   const handlePreviewMix = () => {
     if (!tracks.some((track) => track.file)) return;
     handlePrev();
@@ -1323,12 +1236,6 @@ export default function MixStudio() {
   // Global keyboard shortcuts for selected track (Alt+P, Alt+D, Delete)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.altKey && (event.key === "p" || event.key === "P")) {
-        event.preventDefault();
-        void handleProcessSelectedTrack();
-        return;
-      }
-
       if (event.altKey && (event.key === "d" || event.key === "D")) {
         if (!selectedTrackId) return;
         event.preventDefault();
@@ -1350,7 +1257,6 @@ export default function MixStudio() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
-    handleProcessSelectedTrack,
     handleDuplicateTrack,
     handleDeleteTrack,
     handleClearTrackAudio,
@@ -1803,30 +1709,6 @@ export default function MixStudio() {
             </div>
 
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (featureForMode && !isAdmin && !userFeatureAccess[featureForMode]) {
-                    setShowUpgradeModal(featureForMode);
-                    return;
-                  }
-                  void handleProcessSelectedTrack();
-                }}
-                disabled={
-                  isProcessing ||
-                  !selectedTrackId ||
-                  !tracks.some((track) => track.id === selectedTrackId && track.file)
-                }
-                className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 transition-colors disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40 hover:bg-zinc-700"
-              >
-                {featureForMode && !isAdmin && !userFeatureAccess[featureForMode] && (
-                  <span aria-hidden="true" className="mr-1">
-                    🔒
-                  </span>
-                )}
-                Process Selected Track
-              </button>
-
               {isMixMasterMode && hasMixed ? (
                 <>
                   <button
@@ -1867,26 +1749,16 @@ export default function MixStudio() {
                   </button>
                 </>
               ) : (
-                <>
+                (isMasterOnlyMode || isMixOnlyMode || isCleanupMode || isPodcastMode) && hasMixed && (
                   <button
                     type="button"
-                    onClick={handleProcessFullMix}
-                    disabled={isProcessing || !tracks.some((track) => track.file)}
-                    className="rounded bg-red-600 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:bg-red-600/50"
+                    onClick={handleDownloadMixOnly}
+                    disabled={!hasMixed || !tracks.some((track) => track.file)}
+                    className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
                   >
-                    {primaryActionLabel}
+                    {isMasterOnlyMode ? "Download Master" : "Download Processed"}
                   </button>
-                  {(isMasterOnlyMode || isMixOnlyMode || isCleanupMode || isPodcastMode) && hasMixed && (
-                    <button
-                      type="button"
-                      onClick={handleDownloadMixOnly}
-                      disabled={!hasMixed || !tracks.some((track) => track.file)}
-                      className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
-                    >
-                      {isMasterOnlyMode ? "Download Master" : "Download Processed"}
-                    </button>
-                  )}
-                </>
+                )
               )}
             </div>
           </div>
