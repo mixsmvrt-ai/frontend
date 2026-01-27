@@ -35,14 +35,10 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
   const avatarUrl = (metadata.avatar_url as string) || "";
   const displayName =
     (metadata.full_name as string) || email || (metadata.username as string) || "Artist";
-  const planLabel = (metadata.plan as string) || "Free";
 
   const initials = displayName
     .split(/[^A-Za-z0-9]+/)
     .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "MM";
 
   const formatFlowLabel = (flowKey: string): string => {
     if (flowKey === "audio_cleanup") return "Audio Cleanup";
