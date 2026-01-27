@@ -165,54 +165,14 @@ export function AvatarDropdown({ user, onLogout }: AvatarDropdownProps) {
               <span>Studio</span>
               <span className="text-[10px] text-white/40">⌘S</span>
             </Link>
-            <div className="mt-1 rounded-lg bg-white/3 px-2 py-1.5">
-              <div className="mb-1 flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
-                  My Projects
-                </p>
-                <Link
-                  href="/dashboard"
-                  onClick={handleMenuItemClick()}
-                  className="text-[10px] text-white/50 hover:text-white/80"
-                >
-                  View all
-                </Link>
-              </div>
-              <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
-                {projects.map((project) => (
-                  <button
-                    key={project.id}
-                    type="button"
-                    onClick={() => handleOpenProject(project)}
-                    className="flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-[11px] text-white/80 hover:bg-white/10"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-white">{project.name}</p>
-                      <p className="mt-0.5 truncate text-[10px] text-white/50">
-                        {formatFlowLabel(project.flow_key)} • {formatRelativeTime(project.updated_at)}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(event) => handleDeleteProject(event, project.id)}
-                      disabled={deletingProjectId === project.id}
-                      className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] text-white/50 hover:bg-red-500/20 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label="Delete project"
-                    >
-                      🗑
-                    </button>
-                  </button>
-                ))}
-                {projects.length === 0 && !isLoadingProjects && (
-                  <p className="px-1 py-1 text-[10px] text-white/40">
-                    No projects yet.
-                  </p>
-                )}
-                {isLoadingProjects && (
-                  <p className="px-1 py-1 text-[10px] text-white/50">Loading…</p>
-                )}
-              </div>
-            </div>
+            <Link
+              href="/dashboard"
+              role="menuitem"
+              onClick={handleMenuItemClick()}
+              className="block rounded-lg px-2 py-1.5 text-[12px] text-white/80 transition hover:bg-white/5"
+            >
+              My Projects
+            </Link>
             <Link
               href="/presets"
               role="menuitem"
