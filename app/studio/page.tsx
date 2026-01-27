@@ -987,8 +987,6 @@ export default function MixStudio() {
             label: s.name,
           }));
           setOverlayStages(dynamicStages);
-        } else {
-          setOverlayStages(undefined);
         }
       } else {
         // eslint-disable-next-line no-console
