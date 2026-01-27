@@ -188,6 +188,12 @@ export default function MixStudio() {
     mastering_only: false,
   });
   const [showUpgradeModal, setShowUpgradeModal] = useState<FeatureType | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string | null>(null);
+  const [projectStatus, setProjectStatus] = useState<string | null>(null);
+  const [autosaveMinutes, setAutosaveMinutes] = useState<number>(5);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [isSavingProject, setIsSavingProject] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -233,6 +239,11 @@ export default function MixStudio() {
       flowParam === "podcast"
     ) {
       setStudioMode(flowParam);
+    }
+
+    const projectIdParam = params.get("project_id");
+    if (projectIdParam) {
+      setProjectId(projectIdParam);
     }
   }, []);
 
@@ -280,6 +291,70 @@ export default function MixStudio() {
   const processingCancelRef = useRef<boolean>(false);
 
   const backendJobStatus = useBackendJobStatus(activeJobId);
+
+  // Load project details and any stored studio metadata when a project_id is present
+  useEffect(() => {
+    if (!projectId) return;
+    if (!isSupabaseConfigured || !supabase) return;
+
+    let isMounted = true;
+
+    const loadProject = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("projects")
+          .select(
+            "id, name, status, autosave_interval_min, last_saved_at, meta",
+          )
+          .eq("id", projectId)
+          .single();
+
+        if (!isMounted) return;
+
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to load project", error);
+          return;
+        }
+
+        if (!data) return;
+
+        setProjectName(data.name ?? null);
+        setProjectStatus(data.status ?? null);
+        setAutosaveMinutes(
+          typeof data.autosave_interval_min === "number"
+            ? data.autosave_interval_min
+            : 5,
+        );
+        setLastSavedAt(data.last_saved_at ?? null);
+
+        const meta = (data.meta ?? {}) as any;
+        if (meta && typeof meta === "object") {
+          if (typeof meta.bpm === "number") {
+            setBpm(meta.bpm);
+          }
+          if (typeof meta.genre === "string") {
+            setGenre(meta.genre);
+          }
+          if (typeof meta.sessionKey === "string") {
+            setSessionKey(meta.sessionKey);
+          }
+          if (meta.sessionScale === "Major" || meta.sessionScale === "Minor") {
+            setSessionScale(meta.sessionScale);
+          }
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Error loading project", error);
+      }
+    };
+
+    void loadProject();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [projectId]);
 
   // Reset layout when mode changes
   useEffect(() => {
@@ -1257,6 +1332,80 @@ export default function MixStudio() {
     primaryActionLabel = isProcessing ? "Processing Mix..." : "Process Full Mix";
   }
 
+  const handleSaveProject = useCallback(async () => {
+    if (!projectId) return;
+    if (!isSupabaseConfigured || !supabase) return;
+
+    setIsSavingProject(true);
+    try {
+      const meta = {
+        bpm,
+        genre,
+        sessionKey,
+        sessionScale,
+        studioMode,
+      };
+
+      const now = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from("projects")
+        .update({
+          meta,
+          autosave_interval_min: autosaveMinutes,
+          last_saved_at: now,
+        })
+        .eq("id", projectId)
+        .select("status, last_saved_at, autosave_interval_min")
+        .single();
+
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to save project", error);
+        return;
+      }
+
+      if (data) {
+        setProjectStatus(data.status ?? projectStatus);
+        setLastSavedAt(data.last_saved_at ?? now);
+        setAutosaveMinutes(
+          typeof data.autosave_interval_min === "number"
+            ? data.autosave_interval_min
+            : autosaveMinutes,
+        );
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Error saving project", error);
+    } finally {
+      setIsSavingProject(false);
+    }
+  }, [
+    projectId,
+    autosaveMinutes,
+    bpm,
+    genre,
+    sessionKey,
+    sessionScale,
+    studioMode,
+    projectStatus,
+  ]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    if (!autosaveMinutes || autosaveMinutes <= 0) return;
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const intervalMs = autosaveMinutes * 60 * 1000;
+    const id = window.setInterval(() => {
+      void handleSaveProject();
+    }, intervalMs);
+
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [projectId, autosaveMinutes, handleSaveProject]);
+
   return authChecking ? (
     <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-black text-sm text-white/70">
       <div className="flex flex-col items-center gap-3">
@@ -1279,6 +1428,69 @@ export default function MixStudio() {
             : undefined
         }
       />
+
+      {projectId && (
+        <div className="border-b border-white/10 bg-black/90">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-2 text-xs">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 truncate rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-white/80"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                <span className="text-white/60">Project</span>
+                <span className="truncate font-medium text-white">
+                  {projectName || "Untitled session"}
+                </span>
+                <span className="text-[9px] text-white/40" aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+              {projectStatus && (
+                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-white/50">
+                  {projectStatus}
+                </span>
+              )}
+              {lastSavedAt && (
+                <span className="text-[11px] text-white/50">
+                  Saved {new Date(lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 text-[11px] text-white/60">
+                <span>Autosave</span>
+                <select
+                  className="rounded-full border border-white/15 bg-black px-2 py-1 text-[11px] text-white/90 outline-none"
+                  value={autosaveMinutes}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    // Allow 0 as "Off"
+                    setAutosaveMinutes(Number.isFinite(value) ? value : 0);
+                  }}
+                >
+                  <option value={0}>Off</option>
+                  <option value={1}>Every 1 min</option>
+                  <option value={5}>Every 5 min</option>
+                  <option value={10}>Every 10 min</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void handleSaveProject();
+                }}
+                disabled={isSavingProject}
+                className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[11px] font-medium text-black shadow-[0_0_16px_rgba(255,255,255,0.3)] disabled:cursor-not-allowed disabled:bg-white/70"
+              >
+                {isSavingProject ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <TransportBar
         isPlaying={isPlaying}
