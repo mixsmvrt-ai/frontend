@@ -194,6 +194,7 @@ export default function MixStudio() {
   const [autosaveMinutes, setAutosaveMinutes] = useState<number>(5);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isSavingProject, setIsSavingProject] = useState(false);
+  const [hasLoadedProjectLayout, setHasLoadedProjectLayout] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -342,6 +343,69 @@ export default function MixStudio() {
           if (meta.sessionScale === "Major" || meta.sessionScale === "Minor") {
             setSessionScale(meta.sessionScale);
           }
+
+          if (
+            meta.studioMode === "cleanup" ||
+            meta.studioMode === "mix-only" ||
+            meta.studioMode === "mix-master" ||
+            meta.studioMode === "master-only" ||
+            meta.studioMode === "podcast" ||
+            meta.studioMode === "default"
+          ) {
+            setStudioMode(meta.studioMode as StudioMode);
+          }
+
+          if (typeof meta.throwFxMode === "string") {
+            if (
+              meta.throwFxMode === "off" ||
+              meta.throwFxMode === "1/4" ||
+              meta.throwFxMode === "1/8" ||
+              meta.throwFxMode === "1/16"
+            ) {
+              setThrowFxMode(meta.throwFxMode as ThrowFxMode);
+            }
+          }
+
+          if (typeof meta.selectedPresetId === "string") {
+            setSelectedPresetId(meta.selectedPresetId);
+          }
+
+          if (Array.isArray(meta.tracks) && meta.tracks.length) {
+            const restoredTracks: TrackType[] = meta.tracks
+              .filter((t: any) => t && typeof t === "object")
+              .map((t: any) => ({
+                id: String(t.id ?? crypto.randomUUID()),
+                name: String(t.name ?? "Track"),
+                role:
+                  t.role === "beat" ||
+                  t.role === "vocal" ||
+                  t.role === "background" ||
+                  t.role === "adlib" ||
+                  t.role === "instrument"
+                    ? t.role
+                    : "vocal",
+                volume:
+                  typeof t.volume === "number"
+                    ? Math.min(1, Math.max(0, t.volume))
+                    : 0.9,
+                pan:
+                  typeof t.pan === "number"
+                    ? Math.max(-1, Math.min(1, t.pan))
+                    : 0,
+                gender:
+                  t.gender === "male" || t.gender === "female"
+                    ? t.gender
+                    : undefined,
+                muted: Boolean(t.muted),
+                solo: Boolean(t.solo),
+                processed: Boolean(t.processed),
+              }));
+
+            if (restoredTracks.length) {
+              setTracks(restoredTracks);
+              setHasLoadedProjectLayout(true);
+            }
+          }
         }
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -358,12 +422,13 @@ export default function MixStudio() {
 
   // Reset layout when mode changes
   useEffect(() => {
+    if (hasLoadedProjectLayout) return;
     setTracks(getInitialTracksForMode(studioMode));
     setSelectedTrackId(null);
     setTrackDurations({});
     setTrackLevels({});
     setHasMixed(false);
-  }, [studioMode]);
+  }, [studioMode, hasLoadedProjectLayout]);
 
   // Spacebar play/pause
   useEffect(() => {
@@ -1338,12 +1403,27 @@ export default function MixStudio() {
 
     setIsSavingProject(true);
     try {
+      const trackLayout = tracks.map((track) => ({
+        id: track.id,
+        name: track.name,
+        role: track.role,
+        volume: track.volume,
+        pan: typeof track.pan === "number" ? track.pan : 0,
+        gender: track.gender,
+        muted: Boolean(track.muted),
+        solo: Boolean(track.solo),
+        processed: Boolean(track.processed),
+      }));
+
       const meta = {
         bpm,
         genre,
         sessionKey,
         sessionScale,
         studioMode,
+        throwFxMode,
+        selectedPresetId,
+        tracks: trackLayout,
       };
 
       const now = new Date().toISOString();
@@ -1389,6 +1469,9 @@ export default function MixStudio() {
     sessionScale,
     studioMode,
     projectStatus,
+    tracks,
+    throwFxMode,
+    selectedPresetId,
   ]);
 
   useEffect(() => {
