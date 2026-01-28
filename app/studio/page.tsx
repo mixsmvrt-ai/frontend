@@ -52,6 +52,8 @@ type FeatureType =
   | "mix_master"
   | "mastering_only";
 
+type JobType = "mix" | "master" | "mix_master";
+
 type StudioSnapshot = {
   tracks: TrackType[];
   hasMixed: boolean;
@@ -68,6 +70,13 @@ function featureTypeForMode(mode: StudioMode): FeatureType | null {
   if (mode === "mix-master") return "mix_master";
   if (mode === "master-only") return "mastering_only";
   return null;
+}
+
+function jobTypeForFeature(featureType: FeatureType): JobType {
+  if (featureType === "mixing_only") return "mix";
+  if (featureType === "mastering_only") return "master";
+  // For combined flows and any fallback, use mix_master
+  return "mix_master";
 }
 
 const GENRE_TO_DSP_KEY: Record<string, string> = {
@@ -957,6 +966,7 @@ export default function MixStudio() {
     setHasMixed(false);
 
     const featureType = featureTypeForMode(studioMode) ?? "mix_master";
+    const jobType = jobTypeForFeature(featureType);
     const flowStages =
       FLOW_PROCESSING_STAGE_TEMPLATES[featureType] &&
       FLOW_PROCESSING_STAGE_TEMPLATES[featureType].length
@@ -993,7 +1003,7 @@ export default function MixStudio() {
       const payload = {
         user_id: null as string | null,
         feature_type: featureType,
-        job_type: featureType,
+        job_type: jobType,
         preset_id: selectedPresetId,
         target: "full_mix" as const,
         input_files: {
