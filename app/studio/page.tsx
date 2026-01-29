@@ -22,7 +22,12 @@ import {
 } from "../../components/studio/PresetSelector";
 import { useBackendJobStatus } from "../../lib/useBackendJobStatus";
 import type { TrackPlugin } from "../../components/studio/pluginTypes";
-import { defaultPluginName, isPluginType } from "../../components/studio/pluginTypes";
+import {
+  defaultAIParams,
+  defaultPluginName,
+  defaultPluginParams,
+  isPluginType,
+} from "../../components/studio/pluginTypes";
 import PluginModal from "../../components/studio/PluginModal";
 
 export const dynamic = "force-dynamic";
@@ -462,6 +467,16 @@ export default function MixStudio() {
                         : null;
                     if (!type) return null;
 
+                    const mergedParams = {
+                      ...defaultPluginParams(type),
+                      ...(p.params && typeof p.params === "object" ? p.params : {}),
+                    };
+
+                    const mergedAIParams =
+                      p.aiParams && typeof p.aiParams === "object"
+                        ? { ...defaultAIParams(type), ...p.aiParams }
+                        : { ...defaultAIParams(type) };
+
                     return {
                       id: p.id || crypto.randomUUID(),
                       pluginId: p.pluginId || p.id || crypto.randomUUID(),
@@ -472,10 +487,9 @@ export default function MixStudio() {
                           ? p.name
                           : defaultPluginName(type),
                       order: typeof p.order === "number" ? p.order : index,
-                      params:
-                        p.params && typeof p.params === "object"
-                          ? p.params
-                          : {},
+                      params: mergedParams,
+                      aiParams: mergedAIParams,
+                      preset: typeof p.preset === "string" ? p.preset : undefined,
                       enabled:
                         typeof p.enabled === "boolean" ? p.enabled : true,
                       aiGenerated:
@@ -1466,6 +1480,8 @@ export default function MixStudio() {
           name: plugin.name,
           order: plugin.order,
           params: plugin.params,
+          aiParams: plugin.aiParams,
+          preset: plugin.preset,
           enabled: plugin.enabled,
           aiGenerated: plugin.aiGenerated,
           locked: plugin.locked,
