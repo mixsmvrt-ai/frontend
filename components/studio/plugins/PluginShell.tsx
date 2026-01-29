@@ -3,13 +3,7 @@
 import type React from "react";
 import { useMemo } from "react";
 import type { PluginParams, TrackPlugin } from "../pluginTypes";
-import {
-  applyPluginPreset,
-  defaultAIParams,
-  defaultPluginParams,
-  ensurePluginHasAIParams,
-  getPluginPresets,
-} from "../pluginTypes";
+import * as PluginTypes from "../pluginTypes";
 import Knob from "./primitives/Knob";
 
 type PluginShellProps = {
@@ -51,10 +45,19 @@ export default function PluginShell({
   onHeaderPointerUp,
   onHeaderPointerCancel,
 }: PluginShellProps) {
-  const withAI = useMemo(() => ensurePluginHasAIParams(plugin), [plugin]);
+  const withAI = useMemo(
+    () => (PluginTypes as any).ensurePluginHasAIParams?.(plugin) ?? plugin,
+    [plugin],
+  );
 
-  const defaults = useMemo(() => defaultPluginParams(withAI.pluginType), [withAI.pluginType]);
-  const aiDefaults = useMemo(() => defaultAIParams(withAI.pluginType), [withAI.pluginType]);
+  const defaults = useMemo(
+    () => (PluginTypes as any).defaultPluginParams?.(withAI.pluginType) ?? { mix: 1, output_gain: 0 },
+    [withAI.pluginType],
+  );
+  const aiDefaults = useMemo(
+    () => (PluginTypes as any).defaultAIParams?.(withAI.pluginType) ?? defaults,
+    [defaults, withAI.pluginType],
+  );
 
   const mix = getNumber(withAI.params, "mix", Number(defaults.mix ?? 1));
   const outputGain = getNumber(withAI.params, "output_gain", Number(defaults.output_gain ?? 0));
@@ -63,7 +66,10 @@ export default function PluginShell({
 
   const showAIBadge = hasAI;
 
-  const presets = useMemo(() => getPluginPresets(withAI.pluginType), [withAI.pluginType]);
+  const presets = useMemo(
+    () => (PluginTypes as any).getPluginPresets?.(withAI.pluginType) ?? [],
+    [withAI.pluginType],
+  );
   const presetValue = presets.some((p) => p.id === withAI.preset) ? (withAI.preset as string) : "Default";
 
   return (
@@ -114,14 +120,24 @@ export default function PluginShell({
                   onChange({
                     ...withAI,
                     preset: "Default",
-                    params: { ...defaultPluginParams(withAI.pluginType), mix, output_gain: outputGain },
+                    params: {
+                      ...((PluginTypes as any).defaultPluginParams?.(withAI.pluginType) ?? {
+                        mix: 1,
+                        output_gain: 0,
+                      }),
+                      mix,
+                      output_gain: outputGain,
+                    },
                     locked: false,
                   });
                   return;
                 }
                 const presetObj = presets.find((p) => p.id === value);
                 if (!presetObj) return;
-                onChange(applyPluginPreset(withAI, presetObj.id));
+                const applier = (PluginTypes as any).applyPluginPreset as
+                  | ((p: TrackPlugin, presetId: string) => TrackPlugin)
+                  | undefined;
+                onChange(applier ? applier(withAI, presetObj.id) : { ...withAI, preset: presetObj.id });
               }}
               aria-label="Preset"
             >
@@ -206,7 +222,12 @@ export default function PluginShell({
               onClick={() => {
                 const next: TrackPlugin = {
                   ...withAI,
-                  params: { ...defaultPluginParams(withAI.pluginType) },
+                  params: {
+                    ...((PluginTypes as any).defaultPluginParams?.(withAI.pluginType) ?? {
+                      mix: 1,
+                      output_gain: 0,
+                    }),
+                  },
                   locked: false,
                   aiGenerated: withAI.aiGenerated,
                 };
@@ -225,7 +246,8 @@ export default function PluginShell({
               onClick={() => {
                 const baseline = (withAI.aiParams && typeof withAI.aiParams === "object")
                   ? withAI.aiParams
-                  : defaultAIParams(withAI.pluginType);
+                  : ((PluginTypes as any).defaultAIParams?.(withAI.pluginType) ??
+                      ((PluginTypes as any).defaultPluginParams?.(withAI.pluginType) ?? { mix: 1, output_gain: 0 }));
 
                 onChange({
                   ...withAI,
