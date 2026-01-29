@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import type { TrackType } from "../../app/studio/page";
+import type { TrackPlugin } from "./pluginTypes";
+import TrackPluginRack from "./TrackPluginRack";
 
 const ROLE_ACCENT_COLORS: Record<TrackType["role"], string> = {
   beat: "#22c55e",
@@ -36,6 +38,9 @@ type TrackLaneProps = {
   isAnySoloActive: boolean;
   isSelected: boolean;
   onSelect: (trackId: string) => void;
+  plugins?: TrackPlugin[];
+  onPluginsChange?: (trackId: string, plugins: TrackPlugin[]) => void;
+  onOpenPlugin?: (trackId: string, plugin: TrackPlugin) => void;
   isAudioSelected?: boolean;
   onSelectAudio?: (trackId: string | null) => void;
   onClearAudio?: (trackId: string) => void;
@@ -59,6 +64,9 @@ export default function TrackLane({
    isAnySoloActive,
   isSelected,
   onSelect,
+  plugins,
+  onPluginsChange,
+  onOpenPlugin,
   isAudioSelected,
   onSelectAudio,
   onClearAudio,
@@ -550,6 +558,20 @@ export default function TrackLane({
               }}
               className="max-w-[130px] rounded bg-zinc-800 px-1 py-0.5 text-sm font-medium text-white outline-none ring-1 ring-red-500/40"
             />
+
+            <div className="border-t border-white/10 bg-black/60 px-3 py-2">
+              <TrackPluginRack
+                plugins={plugins || []}
+                onChange={(next) => {
+                  if (!onPluginsChange) return;
+                  onPluginsChange(track.id, next);
+                }}
+                onOpen={(plugin) => {
+                  if (!onOpenPlugin) return;
+                  onOpenPlugin(track.id, plugin);
+                }}
+              />
+            </div>
           ) : (
             <button
               type="button"
