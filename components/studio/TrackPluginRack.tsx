@@ -1,6 +1,7 @@
 "use client";
 
 import type { TrackPlugin, PluginType } from "./pluginTypes";
+import { defaultAIParams, defaultPluginName, defaultPluginParams } from "./pluginTypes";
 
 type TrackPluginRackProps = {
   plugins: TrackPlugin[];
@@ -19,6 +20,9 @@ const AVAILABLE_PLUGIN_TYPES: PluginType[] = [
   "Reverb",
   "Delay",
   "Limiter",
+  "Mastering EQ",
+  "Master Bus Compressor",
+  "Stereo Imager",
 ];
 
 export default function TrackPluginRack({ plugins, onChange, onOpen, hidePlugins }: TrackPluginRackProps) {
@@ -45,9 +49,11 @@ export default function TrackPluginRack({ plugins, onChange, onOpen, hidePlugins
       id,
       pluginId: id,
       pluginType: type,
-      name: type,
+      name: defaultPluginName(type),
       order: nextOrder,
-      params: {},
+      params: defaultPluginParams(type),
+      aiParams: defaultAIParams(type),
+      preset: "AI Suggested",
       enabled: true,
       aiGenerated: false,
       locked: false,
