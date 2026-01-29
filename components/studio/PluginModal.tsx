@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useState } from "react";
 import type { TrackPlugin } from "./pluginTypes";
 import PluginShell from "./plugins/PluginShell";
@@ -18,9 +19,23 @@ type PluginModalProps = {
   plugin: TrackPlugin;
   onChange: (plugin: TrackPlugin) => void;
   onClose: () => void;
+  shellClassName?: string;
+  onHeaderPointerDown?: React.PointerEventHandler<HTMLDivElement>;
+  onHeaderPointerMove?: React.PointerEventHandler<HTMLDivElement>;
+  onHeaderPointerUp?: React.PointerEventHandler<HTMLDivElement>;
+  onHeaderPointerCancel?: React.PointerEventHandler<HTMLDivElement>;
 };
 
-export default function PluginModal({ plugin, onChange, onClose }: PluginModalProps) {
+export default function PluginModal({
+  plugin,
+  onChange,
+  onClose,
+  shellClassName,
+  onHeaderPointerDown,
+  onHeaderPointerMove,
+  onHeaderPointerUp,
+  onHeaderPointerCancel,
+}: PluginModalProps) {
   const [local, setLocal] = useState<TrackPlugin>(plugin);
 
   useEffect(() => {
@@ -64,7 +79,16 @@ export default function PluginModal({ plugin, onChange, onClose }: PluginModalPr
   };
 
   return (
-    <PluginShell plugin={local} onChange={commit} onClose={onClose}>
+    <PluginShell
+      plugin={local}
+      onChange={commit}
+      onClose={onClose}
+      className={shellClassName}
+      onHeaderPointerDown={onHeaderPointerDown}
+      onHeaderPointerMove={onHeaderPointerMove}
+      onHeaderPointerUp={onHeaderPointerUp}
+      onHeaderPointerCancel={onHeaderPointerCancel}
+    >
       {renderPlugin()}
     </PluginShell>
   );
