@@ -12,6 +12,7 @@ type PluginModalProps = {
 
 export default function PluginModal({ plugin, onChange, onClose }: PluginModalProps) {
   const [local, setLocal] = useState<TrackPlugin>(plugin);
+  const [editing, setEditing] = useState<{ key: string; value: string } | null>(null);
 
   const commit = (next: TrackPlugin) => {
     setLocal(next);
@@ -29,6 +30,12 @@ export default function PluginModal({ plugin, onChange, onClose }: PluginModalPr
     });
   };
 
+  const applyNumericEdit = (key: string, rawValue: number, min: number, max: number) => {
+    if (!Number.isFinite(rawValue)) return;
+    const clamped = Math.min(max, Math.max(min, rawValue));
+    handleParamChange(key, clamped);
+  };
+
   const renderControls = () => {
     if (local.pluginType === "EQ") {
       const bands = [
@@ -37,110 +44,334 @@ export default function PluginModal({ plugin, onChange, onClose }: PluginModalPr
         { key: "high_mid", label: "High-Mid" },
         { key: "high", label: "High" },
       ];
+      const min = -12;
+      const max = 12;
+
       return (
         <div className="grid grid-cols-2 gap-4">
-          {bands.map((band) => (
-            <div key={band.key} className="flex flex-col items-center gap-2">
-              <span className="text-[11px] text-white/60">{band.label}</span>
-              <MacroKnob
-                label="Gain (dB)"
-                kind="air"
-                value={(() => {
-                  const raw = Number(local.params[`${band.key}_gain`] ?? 0);
-                  const min = -12;
-                  const max = 12;
-                  const norm = ((raw - min) / (max - min)) * 100;
-                  return Number.isFinite(norm) ? Math.min(100, Math.max(0, norm)) : 50;
-                })()}
-                onChange={(next) => {
-                  const min = -12;
-                  const max = 12;
-                  const clamped = Math.min(100, Math.max(0, next));
-                  const raw = min + (clamped / 100) * (max - min);
-                  handleParamChange(`${band.key}_gain`, raw);
-                }}
-              />
-            </div>
-          ))}
+          {bands.map((band) => {
+            const paramKey = `${band.key}_gain`;
+            const raw = Number(local.params[paramKey] ?? 0);
+            const norm = ((raw - min) / (max - min)) * 100;
+            const clampedNorm = Number.isFinite(norm) ? Math.min(100, Math.max(0, norm)) : 50;
+            const display = `${raw >= 0 ? "+" : ""}${raw.toFixed(1)} dB`;
+            const isEditing = editing?.key === paramKey;
+
+            return (
+              <div key={band.key} className="flex flex-col items-center gap-2">
+                <span className="text-[11px] text-white/60">{band.label}</span>
+                <MacroKnob
+                  label="Gain (dB)"
+                  kind="air"
+                  value={clampedNorm}
+                  onChange={(next) => {
+                    const clamped = Math.min(100, Math.max(0, next));
+                    const nextRaw = min + (clamped / 100) * (max - min);
+                    handleParamChange(paramKey, nextRaw);
+                  }}
+                />
+                <div className="mt-1 text-[11px] text-white/70">
+                  {isEditing ? (
+                    <input
+                      autoFocus
+                      type="number"
+                      className="w-20 rounded bg-white/5 px-1 py-0.5 text-center text-[11px] text-white outline-none ring-1 ring-white/20 focus:ring-red-500/70"
+                      value={editing.value}
+                      onChange={(e) =>
+                        setEditing({ key: paramKey, value: e.target.value })
+                      }
+                      onBlur={() => {
+                        const numeric = parseFloat(editing.value);
+                        applyNumericEdit(paramKey, numeric, min, max);
+                        setEditing(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const numeric = parseFloat(editing.value);
+                          applyNumericEdit(paramKey, numeric, min, max);
+                          setEditing(null);
+                        }
+                        if (e.key === "Escape") {
+                          setEditing(null);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/80 hover:bg-white/10"
+                      onClick={() =>
+                        setEditing({ key: paramKey, value: raw.toFixed(1) })
+                      }
+                    >
+                      {display}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       );
     }
 
     if (local.pluginType === "Compressor") {
+      const thresholdMin = -48;
+      const thresholdMax = 0;
+      const thresholdRaw = Number(local.params.threshold ?? -12);
+      const thresholdNorm =
+        ((thresholdRaw - thresholdMin) / (thresholdMax - thresholdMin)) * 100;
+      const thresholdClamped = Number.isFinite(thresholdNorm)
+        ? Math.min(100, Math.max(0, thresholdNorm))
+        : 50;
+
+      const ratioMin = 1;
+      const ratioMax = 10;
+      const ratioRaw = Number(local.params.ratio ?? 2);
+      const ratioNorm = ((ratioRaw - ratioMin) / (ratioMax - ratioMin)) * 100;
+      const ratioClamped = Number.isFinite(ratioNorm)
+        ? Math.min(100, Math.max(0, ratioNorm))
+        : 20;
+
+      const attackMin = 0.1;
+      const attackMax = 50;
+      const attackRaw = Number(local.params.attack ?? 10);
+      const attackNorm = ((attackRaw - attackMin) / (attackMax - attackMin)) * 100;
+      const attackClamped = Number.isFinite(attackNorm)
+        ? Math.min(100, Math.max(0, attackNorm))
+        : 20;
+
+      const releaseMin = 10;
+      const releaseMax = 500;
+      const releaseRaw = Number(local.params.release ?? 80);
+      const releaseNorm =
+        ((releaseRaw - releaseMin) / (releaseMax - releaseMin)) * 100;
+      const releaseClamped = Number.isFinite(releaseNorm)
+        ? Math.min(100, Math.max(0, releaseNorm))
+        : 30;
+
+      const thresholdDisplay = `${thresholdRaw.toFixed(1)} dB`;
+      const ratioDisplay = `${ratioRaw.toFixed(2)}:1`;
+      const attackDisplay = `${attackRaw.toFixed(1)} ms`;
+      const releaseDisplay = `${releaseRaw.toFixed(0)} ms`;
+
+      const isThresholdEditing = editing?.key === "threshold";
+      const isRatioEditing = editing?.key === "ratio";
+      const isAttackEditing = editing?.key === "attack";
+      const isReleaseEditing = editing?.key === "release";
+
       return (
         <div className="grid grid-cols-2 gap-4">
-          <MacroKnob
-            label="Threshold"
-            kind="punch"
-            value={(() => {
-              const raw = Number(local.params.threshold ?? -12);
-              const min = -48;
-              const max = 0;
-              const norm = ((raw - min) / (max - min)) * 100;
-              return Number.isFinite(norm) ? Math.min(100, Math.max(0, norm)) : 50;
-            })()}
-            onChange={(next) => {
-              const min = -48;
-              const max = 0;
-              const clamped = Math.min(100, Math.max(0, next));
-              const raw = min + (clamped / 100) * (max - min);
-              handleParamChange("threshold", raw);
-            }}
-          />
-          <MacroKnob
-            label="Ratio"
-            kind="punch"
-            value={(() => {
-              const raw = Number(local.params.ratio ?? 2);
-              const min = 1;
-              const max = 10;
-              const norm = ((raw - min) / (max - min)) * 100;
-              return Number.isFinite(norm) ? Math.min(100, Math.max(0, norm)) : 20;
-            })()}
-            onChange={(next) => {
-              const min = 1;
-              const max = 10;
-              const clamped = Math.min(100, Math.max(0, next));
-              const raw = min + (clamped / 100) * (max - min);
-              handleParamChange("ratio", raw);
-            }}
-          />
-          <MacroKnob
-            label="Attack (ms)"
-            kind="punch"
-            value={(() => {
-              const raw = Number(local.params.attack ?? 10);
-              const min = 0.1;
-              const max = 50;
-              const norm = ((raw - min) / (max - min)) * 100;
-              return Number.isFinite(norm) ? Math.min(100, Math.max(0, norm)) : 20;
-            })()}
-            onChange={(next) => {
-              const min = 0.1;
-              const max = 50;
-              const clamped = Math.min(100, Math.max(0, next));
-              const raw = min + (clamped / 100) * (max - min);
-              handleParamChange("attack", raw);
-            }}
-          />
-          <MacroKnob
-            label="Release (ms)"
-            kind="warmth"
-            value={(() => {
-              const raw = Number(local.params.release ?? 80);
-              const min = 10;
-              const max = 500;
-              const norm = ((raw - min) / (max - min)) * 100;
-              return Number.isFinite(norm) ? Math.min(100, Math.max(0, norm)) : 30;
-            })()}
-            onChange={(next) => {
-              const min = 10;
-              const max = 500;
-              const clamped = Math.min(100, Math.max(0, next));
-              const raw = min + (clamped / 100) * (max - min);
-              handleParamChange("release", raw);
-            }}
-          />
+          <div className="flex flex-col items-center gap-2">
+            <MacroKnob
+              label="Threshold"
+              kind="punch"
+              value={thresholdClamped}
+              onChange={(next) => {
+                const clamped = Math.min(100, Math.max(0, next));
+                const raw =
+                  thresholdMin + (clamped / 100) * (thresholdMax - thresholdMin);
+                handleParamChange("threshold", raw);
+              }}
+            />
+            <div className="mt-1 text-[11px] text-white/70">
+              {isThresholdEditing ? (
+                <input
+                  autoFocus
+                  type="number"
+                  className="w-24 rounded bg-white/5 px-1 py-0.5 text-center text-[11px] text-white outline-none ring-1 ring-white/20 focus:ring-red-500/70"
+                  value={editing.value}
+                  onChange={(e) =>
+                    setEditing({ key: "threshold", value: e.target.value })
+                  }
+                  onBlur={() => {
+                    const numeric = parseFloat(editing.value);
+                    applyNumericEdit("threshold", numeric, thresholdMin, thresholdMax);
+                    setEditing(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const numeric = parseFloat(editing.value);
+                      applyNumericEdit(
+                        "threshold",
+                        numeric,
+                        thresholdMin,
+                        thresholdMax,
+                      );
+                      setEditing(null);
+                    }
+                    if (e.key === "Escape") {
+                      setEditing(null);
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/80 hover:bg-white/10"
+                  onClick={() =>
+                    setEditing({ key: "threshold", value: thresholdRaw.toFixed(1) })
+                  }
+                >
+                  {thresholdDisplay}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <MacroKnob
+              label="Ratio"
+              kind="punch"
+              value={ratioClamped}
+              onChange={(next) => {
+                const clamped = Math.min(100, Math.max(0, next));
+                const raw = ratioMin + (clamped / 100) * (ratioMax - ratioMin);
+                handleParamChange("ratio", raw);
+              }}
+            />
+            <div className="mt-1 text-[11px] text-white/70">
+              {isRatioEditing ? (
+                <input
+                  autoFocus
+                  type="number"
+                  className="w-24 rounded bg-white/5 px-1 py-0.5 text-center text-[11px] text-white outline-none ring-1 ring-white/20 focus:ring-red-500/70"
+                  value={editing.value}
+                  onChange={(e) =>
+                    setEditing({ key: "ratio", value: e.target.value })
+                  }
+                  onBlur={() => {
+                    const numeric = parseFloat(editing.value);
+                    applyNumericEdit("ratio", numeric, ratioMin, ratioMax);
+                    setEditing(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const numeric = parseFloat(editing.value);
+                      applyNumericEdit("ratio", numeric, ratioMin, ratioMax);
+                      setEditing(null);
+                    }
+                    if (e.key === "Escape") {
+                      setEditing(null);
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/80 hover:bg-white/10"
+                  onClick={() =>
+                    setEditing({ key: "ratio", value: ratioRaw.toFixed(2) })
+                  }
+                >
+                  {ratioDisplay}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <MacroKnob
+              label="Attack (ms)"
+              kind="punch"
+              value={attackClamped}
+              onChange={(next) => {
+                const clamped = Math.min(100, Math.max(0, next));
+                const raw = attackMin + (clamped / 100) * (attackMax - attackMin);
+                handleParamChange("attack", raw);
+              }}
+            />
+            <div className="mt-1 text-[11px] text-white/70">
+              {isAttackEditing ? (
+                <input
+                  autoFocus
+                  type="number"
+                  className="w-24 rounded bg-white/5 px-1 py-0.5 text-center text-[11px] text-white outline-none ring-1 ring-white/20 focus:ring-red-500/70"
+                  value={editing.value}
+                  onChange={(e) =>
+                    setEditing({ key: "attack", value: e.target.value })
+                  }
+                  onBlur={() => {
+                    const numeric = parseFloat(editing.value);
+                    applyNumericEdit("attack", numeric, attackMin, attackMax);
+                    setEditing(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const numeric = parseFloat(editing.value);
+                      applyNumericEdit("attack", numeric, attackMin, attackMax);
+                      setEditing(null);
+                    }
+                    if (e.key === "Escape") {
+                      setEditing(null);
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/80 hover:bg-white/10"
+                  onClick={() =>
+                    setEditing({ key: "attack", value: attackRaw.toFixed(1) })
+                  }
+                >
+                  {attackDisplay}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <MacroKnob
+              label="Release (ms)"
+              kind="warmth"
+              value={releaseClamped}
+              onChange={(next) => {
+                const clamped = Math.min(100, Math.max(0, next));
+                const raw =
+                  releaseMin + (clamped / 100) * (releaseMax - releaseMin);
+                handleParamChange("release", raw);
+              }}
+            />
+            <div className="mt-1 text-[11px] text-white/70">
+              {isReleaseEditing ? (
+                <input
+                  autoFocus
+                  type="number"
+                  className="w-24 rounded bg-white/5 px-1 py-0.5 text-center text-[11px] text-white outline-none ring-1 ring-white/20 focus:ring-red-500/70"
+                  value={editing.value}
+                  onChange={(e) =>
+                    setEditing({ key: "release", value: e.target.value })
+                  }
+                  onBlur={() => {
+                    const numeric = parseFloat(editing.value);
+                    applyNumericEdit("release", numeric, releaseMin, releaseMax);
+                    setEditing(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const numeric = parseFloat(editing.value);
+                      applyNumericEdit("release", numeric, releaseMin, releaseMax);
+                      setEditing(null);
+                    }
+                    if (e.key === "Escape") {
+                      setEditing(null);
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/80 hover:bg-white/10"
+                  onClick={() =>
+                    setEditing({ key: "release", value: releaseRaw.toFixed(0) })
+                  }
+                >
+                  {releaseDisplay}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       );
     }
