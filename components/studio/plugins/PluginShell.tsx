@@ -3,7 +3,13 @@
 import type React from "react";
 import { useMemo } from "react";
 import type { PluginParams, TrackPlugin } from "../pluginTypes";
-import { defaultAIParams, defaultPluginParams, ensurePluginHasAIParams } from "../pluginTypes";
+import {
+  applyPluginPreset,
+  defaultAIParams,
+  defaultPluginParams,
+  ensurePluginHasAIParams,
+  getPluginPresets,
+} from "../pluginTypes";
 import Knob from "./primitives/Knob";
 
 type PluginShellProps = {
@@ -57,6 +63,9 @@ export default function PluginShell({
 
   const showAIBadge = hasAI;
 
+  const presets = useMemo(() => getPluginPresets(withAI.pluginType), [withAI.pluginType]);
+  const presetValue = presets.some((p) => p.id === withAI.preset) ? (withAI.preset as string) : "Default";
+
   return (
     <div
       className={`flex w-[min(760px,92vw)] max-h-[min(640px,82vh)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-950/95 to-black/95 shadow-[0_0_60px_rgba(0,0,0,0.75)] ${
@@ -98,14 +107,30 @@ export default function PluginShell({
             <select
               data-no-drag
               className="h-8 rounded-lg border border-white/10 bg-black/40 px-2 text-[11px] text-white/70 outline-none hover:border-red-500/40"
-              value={withAI.preset ?? "Default"}
-              onChange={(e) => onChange({ ...withAI, preset: e.target.value })}
+              value={presetValue}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "Default") {
+                  onChange({
+                    ...withAI,
+                    preset: "Default",
+                    params: { ...defaultPluginParams(withAI.pluginType), mix, output_gain: outputGain },
+                    locked: false,
+                  });
+                  return;
+                }
+                const presetObj = presets.find((p) => p.id === value);
+                if (!presetObj) return;
+                onChange(applyPluginPreset(withAI, presetObj.id));
+              }}
               aria-label="Preset"
             >
               <option value="Default">Default</option>
-              <option value="AI Suggested">AI Suggested</option>
-              <option value="Vocal Clean">Vocal Clean</option>
-              <option value="Warm">Warm</option>
+              {presets.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
             </select>
 
             {/* Power */}
