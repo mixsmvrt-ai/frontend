@@ -28,7 +28,8 @@ import {
   defaultPluginParams,
   isPluginType,
 } from "../../components/studio/pluginTypes";
-import PluginModal from "../../components/studio/PluginModal";
+import type { PluginWindowPosition } from "../../components/studio/PluginWindow";
+import PluginWindow from "../../components/studio/PluginWindow";
 
 export const dynamic = "force-dynamic";
 
@@ -1374,10 +1375,52 @@ export default function MixStudio() {
   const isPodcastMode = studioMode === "podcast";
   const hasBeatTrack = tracks.some((track) => track.role === "beat" && track.file);
 
-  const [activePluginEditor, setActivePluginEditor] = useState<{
-    trackId: string;
-    pluginId: string;
-  } | null>(null);
+  const [openPluginEditors, setOpenPluginEditors] = useState<
+    Array<{ trackId: string; pluginId: string }>
+  >([]);
+  const [pluginWindowPositions, setPluginWindowPositions] = useState<Record<string, PluginWindowPosition>>(
+    {},
+  );
+
+  const getDefaultPluginWindowPos = useCallback((): PluginWindowPosition => {
+    const w = 760;
+    const h = 560;
+    const margin = 12;
+    const x = Math.max(margin, Math.round(window.innerWidth / 2 - w / 2));
+    const y = Math.max(margin, Math.round(window.innerHeight / 2 - h / 2));
+    return { x, y };
+  }, []);
+
+  const bringPluginToFront = useCallback((trackId: string, pluginId: string) => {
+    setOpenPluginEditors((prev) => {
+      const idx = prev.findIndex((p) => p.trackId === trackId && p.pluginId === pluginId);
+      if (idx < 0) return prev;
+      const next = [...prev];
+      const [item] = next.splice(idx, 1);
+      next.push(item);
+      return next;
+    });
+  }, []);
+
+  const openPluginWindow = useCallback(
+    (trackId: string, pluginId: string) => {
+      const windowId = `${trackId}:${pluginId}`;
+      setPluginWindowPositions((prev) => {
+        if (prev[windowId]) return prev;
+        return { ...prev, [windowId]: getDefaultPluginWindowPos() };
+      });
+      setOpenPluginEditors((prev) => {
+        const exists = prev.some((p) => p.trackId === trackId && p.pluginId === pluginId);
+        const base = exists ? prev.filter((p) => !(p.trackId === trackId && p.pluginId === pluginId)) : prev;
+        return [...base, { trackId, pluginId }];
+      });
+    },
+    [getDefaultPluginWindowPos],
+  );
+
+  const closeTopmostPluginWindow = useCallback(() => {
+    setOpenPluginEditors((prev) => (prev.length ? prev.slice(0, -1) : prev));
+  }, []);
 
   const handleCancelProcessingOverlay = () => {
     // Signal any in-flight processing loops to stop and avoid
@@ -1388,6 +1431,18 @@ export default function MixStudio() {
     setActiveJobId(null);
     setOverlayStages(undefined);
   };
+
+  useEffect(() => {
+    if (!openPluginEditors.length) return;
+    const onDocPointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest(".mixsmvrt-plugin-window")) return;
+      closeTopmostPluginWindow();
+    };
+    document.addEventListener("pointerdown", onDocPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
+  }, [closeTopmostPluginWindow, openPluginEditors.length]);
 
   const featureForMode: FeatureType | null = isCleanupMode
     ? "audio_cleanup"
@@ -1720,7 +1775,7 @@ export default function MixStudio() {
                 plugins={track.plugins}
                 onPluginsChange={handleTrackPluginsChange}
                 onOpenPlugin={(trackId, plugin) => {
-                  setActivePluginEditor({ trackId, pluginId: plugin.id });
+                  openPluginWindow(trackId, plugin.id);
                 }}
                 isAudioSelected={selectedClipTrackId === track.id}
                 onSelectAudio={(trackId) => setSelectedClipTrackId(trackId)}
@@ -1987,34 +2042,43 @@ export default function MixStudio() {
           </div>
         </div>
       </div>
-      {/* Simple upgrade modal shell – wiring to PayPal checkout/webhooks happens elsewhere */}
-      {activePluginEditor && (
-        (() => {
-          const track = tracks.find((t) => t.id === activePluginEditor.trackId);
-          const plugin = track?.plugins?.find((p) => p.id === activePluginEditor.pluginId);
-          if (!track || !plugin) return null;
-          return (
-            <PluginModal
-              plugin={plugin}
-              onChange={(next) => {
-                setTracks((prev) =>
-                  prev.map((t) =>
-                    t.id === track.id
-                      ? {
-                          ...t,
-                          plugins: (t.plugins || []).map((p) =>
-                            p.id === plugin.id ? next : p,
-                          ),
-                        }
-                      : t,
-                  ),
-                );
-              }}
-              onClose={() => setActivePluginEditor(null)}
-            />
-          );
-        })()
-      )}
+      {openPluginEditors.map((ref, index) => {
+        const track = tracks.find((t) => t.id === ref.trackId);
+        const plugin = track?.plugins?.find((p) => p.id === ref.pluginId);
+        if (!track || !plugin) return null;
+        const windowId = `${ref.trackId}:${ref.pluginId}`;
+        const pos = pluginWindowPositions[windowId] ?? { x: 24 + index * 16, y: 24 + index * 16 };
+        return (
+          <PluginWindow
+            key={windowId}
+            windowId={windowId}
+            plugin={plugin}
+            position={pos}
+            zIndex={60 + index}
+            onFocus={() => bringPluginToFront(ref.trackId, ref.pluginId)}
+            onPositionChange={(nextPos) =>
+              setPluginWindowPositions((prev) => ({ ...prev, [windowId]: nextPos }))
+            }
+            onChange={(next) => {
+              setTracks((prev) =>
+                prev.map((t) =>
+                  t.id === track.id
+                    ? {
+                        ...t,
+                        plugins: (t.plugins || []).map((p) => (p.id === plugin.id ? next : p)),
+                      }
+                    : t,
+                ),
+              );
+            }}
+            onClose={() =>
+              setOpenPluginEditors((prev) =>
+                prev.filter((p) => !(p.trackId === ref.trackId && p.pluginId === ref.pluginId)),
+              )
+            }
+          />
+        );
+      })}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#050509]/95 p-4 shadow-[0_0_45px_rgba(0,0,0,0.85)]">
