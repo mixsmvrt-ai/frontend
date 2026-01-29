@@ -23,6 +23,7 @@ import {
 import { useBackendJobStatus } from "../../lib/useBackendJobStatus";
 import type { TrackPlugin } from "../../components/studio/pluginTypes";
 import { defaultPluginName, isPluginType } from "../../components/studio/pluginTypes";
+import PluginModal from "../../components/studio/PluginModal";
 
 export const dynamic = "force-dynamic";
 
@@ -1359,6 +1360,11 @@ export default function MixStudio() {
   const isPodcastMode = studioMode === "podcast";
   const hasBeatTrack = tracks.some((track) => track.role === "beat" && track.file);
 
+  const [activePluginEditor, setActivePluginEditor] = useState<{
+    trackId: string;
+    pluginId: string;
+  } | null>(null);
+
   const handleCancelProcessingOverlay = () => {
     // Signal any in-flight processing loops to stop and avoid
     // committing processed audio back into the tracks state.
@@ -1383,6 +1389,22 @@ export default function MixStudio() {
 
   const canUndo = undoStack.length > 0 && !isProcessing;
   const canRedo = redoStack.length > 0 && !isProcessing;
+
+  const handleTrackPluginsChange = useCallback(
+    (trackId: string, plugins: TrackPlugin[]) => {
+      setTracks((prev) =>
+        prev.map((track) =>
+          track.id === trackId
+            ? {
+                ...track,
+                plugins,
+              }
+            : track,
+        ),
+      );
+    },
+    [],
+  );
 
   const handleUndo = () => {
     if (!canUndo) return;
@@ -1679,6 +1701,11 @@ export default function MixStudio() {
                 isAnySoloActive={isAnySoloActive}
                 isSelected={selectedTrackId === track.id}
                 onSelect={handleSelectTrack}
+                plugins={track.plugins}
+                onPluginsChange={handleTrackPluginsChange}
+                onOpenPlugin={(trackId, plugin) => {
+                  setActivePluginEditor({ trackId, pluginId: plugin.id });
+                }}
                 isAudioSelected={selectedClipTrackId === track.id}
                 onSelectAudio={(trackId) => setSelectedClipTrackId(trackId)}
                 onClearAudio={handleClearTrackAudio}
@@ -1945,6 +1972,33 @@ export default function MixStudio() {
         </div>
       </div>
       {/* Simple upgrade modal shell – wiring to PayPal checkout/webhooks happens elsewhere */}
+      {activePluginEditor && (
+        (() => {
+          const track = tracks.find((t) => t.id === activePluginEditor.trackId);
+          const plugin = track?.plugins?.find((p) => p.id === activePluginEditor.pluginId);
+          if (!track || !plugin) return null;
+          return (
+            <PluginModal
+              plugin={plugin}
+              onChange={(next) => {
+                setTracks((prev) =>
+                  prev.map((t) =>
+                    t.id === track.id
+                      ? {
+                          ...t,
+                          plugins: (t.plugins || []).map((p) =>
+                            p.id === plugin.id ? next : p,
+                          ),
+                        }
+                      : t,
+                  ),
+                );
+              }}
+              onClose={() => setActivePluginEditor(null)}
+            />
+          );
+        })()
+      )}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#050509]/95 p-4 shadow-[0_0_45px_rgba(0,0,0,0.85)]">
