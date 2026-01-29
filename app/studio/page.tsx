@@ -21,6 +21,8 @@ import {
   type ThrowFxMode,
 } from "../../components/studio/PresetSelector";
 import { useBackendJobStatus } from "../../lib/useBackendJobStatus";
+import type { TrackPlugin } from "../../components/studio/pluginTypes";
+import { defaultPluginName, isPluginType } from "../../components/studio/pluginTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,7 @@ export type TrackType = {
   solo?: boolean;
   // Visually indicate that this track's audio has been processed/mastered.
   processed?: boolean;
+  plugins?: TrackPlugin[];
 };
 
 type StudioMode =
@@ -73,10 +76,10 @@ function featureTypeForMode(mode: StudioMode): FeatureType | null {
 }
 
 function jobTypeForFeature(featureType: FeatureType): JobType {
-  if (featureType === "mixing_only") return "mix";
   if (featureType === "mastering_only") return "master";
-  // For combined flows and any fallback, use mix_master
-  return "mix_master";
+  if (featureType === "mix_master") return "mix_master";
+  // For cleanup and mix-only flows, use mix
+  return "mix";
 }
 
 const GENRE_TO_DSP_KEY: Record<string, string> = {
@@ -420,33 +423,74 @@ export default function MixStudio() {
           if (Array.isArray(meta.tracks) && meta.tracks.length) {
             const restoredTracks: TrackType[] = meta.tracks
               .filter((t: any) => t && typeof t === "object")
-              .map((t: any) => ({
-                id: String(t.id ?? crypto.randomUUID()),
-                name: String(t.name ?? "Track"),
-                role:
-                  t.role === "beat" ||
-                  t.role === "vocal" ||
-                  t.role === "background" ||
-                  t.role === "adlib" ||
-                  t.role === "instrument"
-                    ? t.role
-                    : "vocal",
-                volume:
-                  typeof t.volume === "number"
-                    ? Math.min(1, Math.max(0, t.volume))
-                    : 0.9,
-                pan:
-                  typeof t.pan === "number"
-                    ? Math.max(-1, Math.min(1, t.pan))
-                    : 0,
-                gender:
-                  t.gender === "male" || t.gender === "female"
-                    ? t.gender
-                    : undefined,
-                muted: Boolean(t.muted),
-                solo: Boolean(t.solo),
-                processed: Boolean(t.processed),
-              }));
+              .map((t: any) => {
+                const base: TrackType = {
+                  id: String(t.id ?? crypto.randomUUID()),
+                  name: String(t.name ?? "Track"),
+                  role:
+                    t.role === "beat" ||
+                    t.role === "vocal" ||
+                    t.role === "background" ||
+                    t.role === "adlib" ||
+                    t.role === "instrument"
+                      ? t.role
+                      : "vocal",
+                  volume:
+                    typeof t.volume === "number"
+                      ? Math.min(1, Math.max(0, t.volume))
+                      : 0.9,
+                  pan:
+                    typeof t.pan === "number"
+                      ? Math.max(-1, Math.min(1, t.pan))
+                      : 0,
+                  gender:
+                    t.gender === "male" || t.gender === "female"
+                      ? t.gender
+                      : undefined,
+                  muted: Boolean(t.muted),
+                  solo: Boolean(t.solo),
+                  processed: Boolean(t.processed),
+                };
+
+                const rawPlugins = Array.isArray(t.plugins) ? t.plugins : [];
+                const plugins: TrackPlugin[] = rawPlugins
+                  .map((p: any, index: number): TrackPlugin | null => {
+                    const type =
+                      typeof p.pluginType === "string" && isPluginType(p.pluginType)
+                        ? p.pluginType
+                        : null;
+                    if (!type) return null;
+
+                    return {
+                      id: p.id || crypto.randomUUID(),
+                      pluginId: p.pluginId || p.id || crypto.randomUUID(),
+                      trackId: base.id,
+                      pluginType: type,
+                      name:
+                        typeof p.name === "string" && p.name.length > 0
+                          ? p.name
+                          : defaultPluginName(type),
+                      order: typeof p.order === "number" ? p.order : index,
+                      params:
+                        p.params && typeof p.params === "object"
+                          ? p.params
+                          : {},
+                      enabled:
+                        typeof p.enabled === "boolean" ? p.enabled : true,
+                      aiGenerated:
+                        typeof p.aiGenerated === "boolean" ? p.aiGenerated : true,
+                      locked:
+                        typeof p.locked === "boolean" ? p.locked : !!p.aiGenerated,
+                    };
+                  })
+                  .filter((p: TrackPlugin | null): p is TrackPlugin => p !== null)
+                  .sort((a, b) => a.order - b.order);
+
+                return {
+                  ...base,
+                  plugins,
+                };
+              });
 
             if (restoredTracks.length) {
               setTracks(restoredTracks);
@@ -1393,6 +1437,17 @@ export default function MixStudio() {
         muted: Boolean(track.muted),
         solo: Boolean(track.solo),
         processed: Boolean(track.processed),
+        plugins: (track.plugins || []).map((plugin) => ({
+          id: plugin.id,
+          pluginId: plugin.pluginId,
+          pluginType: plugin.pluginType,
+          name: plugin.name,
+          order: plugin.order,
+          params: plugin.params,
+          enabled: plugin.enabled,
+          aiGenerated: plugin.aiGenerated,
+          locked: plugin.locked,
+        })),
       }));
 
       const meta = {
