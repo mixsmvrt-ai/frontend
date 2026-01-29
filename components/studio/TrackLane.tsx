@@ -558,20 +558,6 @@ export default function TrackLane({
               }}
               className="max-w-[130px] rounded bg-zinc-800 px-1 py-0.5 text-sm font-medium text-white outline-none ring-1 ring-red-500/40"
             />
-
-            <div className="border-t border-white/10 bg-black/60 px-3 py-2">
-              <TrackPluginRack
-                plugins={plugins || []}
-                onChange={(next) => {
-                  if (!onPluginsChange) return;
-                  onPluginsChange(track.id, next);
-                }}
-                onOpen={(plugin) => {
-                  if (!onOpenPlugin) return;
-                  onOpenPlugin(track.id, plugin);
-                }}
-              />
-            </div>
           ) : (
             <button
               type="button"
@@ -843,11 +829,25 @@ export default function TrackLane({
         )}
         <div
           ref={containerRef}
-            className={`relative z-10 h-[72px] w-full overflow-hidden transform transition-transform duration-300 ${
-              track.processed ? "scale-y-110" : "scale-y-100"
-            } ${isAudioSelected ? "ring-2 ring-red-400/80" : ""}`}
-            style={{ transformOrigin: "center center" }}
+          className={`relative z-10 h-[72px] w-full overflow-hidden transform transition-transform duration-300 ${
+            track.processed ? "scale-y-110" : "scale-y-100"
+          } ${isAudioSelected ? "ring-2 ring-red-400/80" : ""}`}
+          style={{ transformOrigin: "center center" }}
         />
+
+        <div className="absolute inset-x-0 bottom-0 z-20 border-t border-white/10 bg-black/60 px-3 py-2">
+          <TrackPluginRack
+            plugins={plugins || []}
+            onChange={(next) => {
+              if (!onPluginsChange) return;
+              onPluginsChange(track.id, next);
+            }}
+            onOpen={(plugin) => {
+              if (!onOpenPlugin) return;
+              onOpenPlugin(track.id, plugin);
+            }}
+          />
+        </div>
       </div>
 
       {isContextMenuOpen && contextMenuPos && (
