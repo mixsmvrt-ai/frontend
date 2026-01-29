@@ -1337,50 +1337,16 @@ export default function MixStudio() {
     }
   };
 
-  // Global keyboard shortcuts for selected track (Alt+P, Alt+D, Delete)
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.altKey && (event.key === "d" || event.key === "D")) {
-        if (!selectedTrackId) return;
-        event.preventDefault();
-        handleDuplicateTrack(selectedTrackId);
-        return;
-      }
-
-      if (!event.altKey && event.key === "Delete") {
-        event.preventDefault();
-        if (selectedClipTrackId) {
-          handleClearTrackAudio(selectedClipTrackId);
-          return;
-        }
-        if (!selectedTrackId) return;
-        handleDeleteTrack(selectedTrackId);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    handleDuplicateTrack,
-    handleDeleteTrack,
-    handleClearTrackAudio,
-    selectedTrackId,
-    selectedClipTrackId,
-  ]);
-
-  const isMixMasterMode = studioMode === "mix-master";
-  const isMixOnlyMode = studioMode === "mix-only";
-  const isMasterOnlyMode = studioMode === "master-only";
-  const isCleanupMode = studioMode === "cleanup";
-  const isPodcastMode = studioMode === "podcast";
-  const hasBeatTrack = tracks.some((track) => track.role === "beat" && track.file);
-
   const [openPluginEditors, setOpenPluginEditors] = useState<
     Array<{ trackId: string; pluginId: string }>
   >([]);
-  const [pluginWindowPositions, setPluginWindowPositions] = useState<Record<string, PluginWindowPosition>>(
-    {},
-  );
+  const [pluginWindowPositions, setPluginWindowPositions] = useState<
+    Record<string, PluginWindowPosition>
+  >({});
+
+  const closeTopmostPluginWindow = useCallback(() => {
+    setOpenPluginEditors((prev) => (prev.length ? prev.slice(0, -1) : prev));
+  }, []);
 
   const getDefaultPluginWindowPos = useCallback((): PluginWindowPosition => {
     const w = 760;
@@ -1411,16 +1377,57 @@ export default function MixStudio() {
       });
       setOpenPluginEditors((prev) => {
         const exists = prev.some((p) => p.trackId === trackId && p.pluginId === pluginId);
-        const base = exists ? prev.filter((p) => !(p.trackId === trackId && p.pluginId === pluginId)) : prev;
+        const base = exists
+          ? prev.filter((p) => !(p.trackId === trackId && p.pluginId === pluginId))
+          : prev;
         return [...base, { trackId, pluginId }];
       });
     },
     [getDefaultPluginWindowPos],
   );
 
-  const closeTopmostPluginWindow = useCallback(() => {
-    setOpenPluginEditors((prev) => (prev.length ? prev.slice(0, -1) : prev));
-  }, []);
+  // Global keyboard shortcuts for selected track (Alt+P, Alt+D, Delete)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeTopmostPluginWindow();
+        return;
+      }
+      if (event.altKey && (event.key === "d" || event.key === "D")) {
+        if (!selectedTrackId) return;
+        event.preventDefault();
+        handleDuplicateTrack(selectedTrackId);
+        return;
+      }
+
+      if (!event.altKey && event.key === "Delete") {
+        event.preventDefault();
+        if (selectedClipTrackId) {
+          handleClearTrackAudio(selectedClipTrackId);
+          return;
+        }
+        if (!selectedTrackId) return;
+        handleDeleteTrack(selectedTrackId);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    closeTopmostPluginWindow,
+    handleDuplicateTrack,
+    handleDeleteTrack,
+    handleClearTrackAudio,
+    selectedTrackId,
+    selectedClipTrackId,
+  ]);
+
+  const isMixMasterMode = studioMode === "mix-master";
+  const isMixOnlyMode = studioMode === "mix-only";
+  const isMasterOnlyMode = studioMode === "master-only";
+  const isCleanupMode = studioMode === "cleanup";
+  const isPodcastMode = studioMode === "podcast";
+  const hasBeatTrack = tracks.some((track) => track.role === "beat" && track.file);
 
   const handleCancelProcessingOverlay = () => {
     // Signal any in-flight processing loops to stop and avoid
