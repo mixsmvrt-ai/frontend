@@ -60,6 +60,15 @@ export default function TrackPluginRack({ plugins, onChange, onOpen, hidePlugins
       {Array.from({ length: MAX_SLOTS }).map((_, index) => {
         const plugin = sorted.find((p) => p.order === index);
         if (!plugin) {
+          if (hidePlugins) {
+            return (
+              <div
+                key={index}
+                className="h-6 rounded border border-dashed border-white/15 bg-transparent"
+              />
+            );
+          }
+
           return (
             <button
               key={index}
@@ -72,15 +81,6 @@ export default function TrackPluginRack({ plugins, onChange, onOpen, hidePlugins
             >
               +
             </button>
-          );
-        }
-
-        if (hidePlugins) {
-          return (
-            <div
-              key={plugin.id}
-              className="h-6 rounded border border-white/15 bg-zinc-950/60"
-            />
           );
         }
 
