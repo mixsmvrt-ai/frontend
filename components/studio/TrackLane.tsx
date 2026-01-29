@@ -5,6 +5,7 @@ import WaveSurfer from "wavesurfer.js";
 import type { TrackType } from "../../app/studio/page";
 import type { TrackPlugin } from "./pluginTypes";
 import TrackPluginRack from "./TrackPluginRack";
+import { buildWebAudioFiltersForPlugins } from "./plugins/runtime/webAudioFilters";
 
 const ROLE_ACCENT_COLORS: Record<TrackType["role"], string> = {
   beat: "#22c55e",
@@ -78,6 +79,10 @@ export default function TrackLane({
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const pannerRef = useRef<StereoPannerNode | null>(null);
+  const backendRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const pluginFiltersCleanupRef = useRef<null | (() => void)>(null);
+  const pluginApplyRafRef = useRef<number | null>(null);
   const meterRafRef = useRef<number | null>(null);
   const baseVolumeRef = useRef(track.volume);
   const masterVolumeRef = useRef(masterVolume);
@@ -219,7 +224,10 @@ export default function TrackLane({
       const backend: any = (ws as any).backend;
       if (!backend || typeof backend.ac === "undefined") return;
 
+      backendRef.current = backend;
+
       const ac: AudioContext = backend.ac as AudioContext;
+      audioContextRef.current = ac;
       const panner: StereoPannerNode | null =
         typeof (ac as any).createStereoPanner === "function"
           ? (ac as any).createStereoPanner()
@@ -233,6 +241,7 @@ export default function TrackLane({
       analyser.smoothingTimeConstant = 0.8;
 
       if (typeof backend.setFilters === "function") {
+        // Apply pan + plugins + analyser as the filter chain.
         const filters: AudioNode[] = [];
         if (panner) {
           panner.pan.value = track.pan ?? 0;
@@ -241,6 +250,17 @@ export default function TrackLane({
         } else {
           pannerRef.current = null;
         }
+
+        // Clean up any previous plugin graph nodes before rebuilding.
+        if (pluginFiltersCleanupRef.current) {
+          pluginFiltersCleanupRef.current();
+          pluginFiltersCleanupRef.current = null;
+        }
+
+        const built = buildWebAudioFiltersForPlugins(ac, plugins || []);
+        pluginFiltersCleanupRef.current = built.dispose;
+        filters.push(...built.filters);
+
         filters.push(analyser);
         backend.setFilters(filters);
       }
@@ -280,12 +300,22 @@ export default function TrackLane({
     });
 
     return () => {
+      if (pluginApplyRafRef.current != null) {
+        cancelAnimationFrame(pluginApplyRafRef.current);
+        pluginApplyRafRef.current = null;
+      }
       if (meterRafRef.current != null) {
         cancelAnimationFrame(meterRafRef.current);
         meterRafRef.current = null;
       }
       analyserRef.current = null;
       pannerRef.current = null;
+      backendRef.current = null;
+      audioContextRef.current = null;
+      if (pluginFiltersCleanupRef.current) {
+        pluginFiltersCleanupRef.current();
+        pluginFiltersCleanupRef.current = null;
+      }
       ws.un("audioprocess", handleAudioProcess);
 
       const destroyResult = ws.destroy();
@@ -306,6 +336,39 @@ export default function TrackLane({
       URL.revokeObjectURL(objectUrl);
     };
   }, [track.file, onLevelChange, track.id]);
+
+  // Rebuild plugin filter graph when plugins change.
+  useEffect(() => {
+    const backend = backendRef.current;
+    const ac = audioContextRef.current;
+    const analyser = analyserRef.current;
+
+    if (!backend || !ac || !analyser || typeof backend.setFilters !== "function") return;
+
+    if (pluginApplyRafRef.current != null) {
+      cancelAnimationFrame(pluginApplyRafRef.current);
+      pluginApplyRafRef.current = null;
+    }
+
+    pluginApplyRafRef.current = requestAnimationFrame(() => {
+      pluginApplyRafRef.current = null;
+      const filters: AudioNode[] = [];
+      if (pannerRef.current) {
+        filters.push(pannerRef.current);
+      }
+
+      if (pluginFiltersCleanupRef.current) {
+        pluginFiltersCleanupRef.current();
+        pluginFiltersCleanupRef.current = null;
+      }
+
+      const built = buildWebAudioFiltersForPlugins(ac, plugins || []);
+      pluginFiltersCleanupRef.current = built.dispose;
+      filters.push(...built.filters);
+      filters.push(analyser);
+      backend.setFilters(filters);
+    });
+  }, [plugins]);
 
   // React to zoom changes
   useEffect(() => {
