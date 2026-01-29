@@ -11,6 +11,11 @@ type PluginShellProps = {
   onChange: (plugin: TrackPlugin) => void;
   onClose: () => void;
   children: React.ReactNode;
+  className?: string;
+  onHeaderPointerDown?: React.PointerEventHandler<HTMLDivElement>;
+  onHeaderPointerMove?: React.PointerEventHandler<HTMLDivElement>;
+  onHeaderPointerUp?: React.PointerEventHandler<HTMLDivElement>;
+  onHeaderPointerCancel?: React.PointerEventHandler<HTMLDivElement>;
 };
 
 function getNumber(params: PluginParams, key: string, fallback: number) {
@@ -29,7 +34,17 @@ function setParam(plugin: TrackPlugin, key: string, value: number | boolean | st
   };
 }
 
-export default function PluginShell({ plugin, onChange, onClose, children }: PluginShellProps) {
+export default function PluginShell({
+  plugin,
+  onChange,
+  onClose,
+  children,
+  className,
+  onHeaderPointerDown,
+  onHeaderPointerMove,
+  onHeaderPointerUp,
+  onHeaderPointerCancel,
+}: PluginShellProps) {
   const withAI = useMemo(() => ensurePluginHasAIParams(plugin), [plugin]);
 
   const defaults = useMemo(() => defaultPluginParams(withAI.pluginType), [withAI.pluginType]);
@@ -43,10 +58,19 @@ export default function PluginShell({ plugin, onChange, onClose, children }: Plu
   const showAIBadge = hasAI;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-950/95 to-black/95 shadow-[0_0_60px_rgba(0,0,0,0.85)]">
+    <div
+      className={`flex w-[min(760px,92vw)] max-h-[min(640px,82vh)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-950/95 to-black/95 shadow-[0_0_60px_rgba(0,0,0,0.75)] ${
+        className ?? ""
+      }`}
+    >
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
+        <div
+          className="flex cursor-move select-none items-center justify-between gap-4 border-b border-white/10 px-4 py-3"
+          onPointerDown={onHeaderPointerDown}
+          onPointerMove={onHeaderPointerMove}
+          onPointerUp={onHeaderPointerUp}
+          onPointerCancel={onHeaderPointerCancel}
+        >
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-red-400">
               Plugin
@@ -72,6 +96,7 @@ export default function PluginShell({ plugin, onChange, onClose, children }: Plu
           <div className="flex items-center gap-2">
             {/* Preset */}
             <select
+              data-no-drag
               className="h-8 rounded-lg border border-white/10 bg-black/40 px-2 text-[11px] text-white/70 outline-none hover:border-red-500/40"
               value={withAI.preset ?? "Default"}
               onChange={(e) => onChange({ ...withAI, preset: e.target.value })}
@@ -87,6 +112,7 @@ export default function PluginShell({ plugin, onChange, onClose, children }: Plu
             <button
               type="button"
               onClick={() => onChange({ ...withAI, enabled: !withAI.enabled })}
+              data-no-drag
               className={`inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium ${
                 withAI.enabled
                   ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-200"
@@ -100,6 +126,7 @@ export default function PluginShell({ plugin, onChange, onClose, children }: Plu
             <button
               type="button"
               onClick={onClose}
+              data-no-drag
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-black/30 text-white/70 hover:border-white/20 hover:bg-white/5"
               aria-label="Close plugin"
             >
@@ -109,9 +136,11 @@ export default function PluginShell({ plugin, onChange, onClose, children }: Plu
         </div>
 
         {/* Main */}
-        <div className="grid grid-cols-12 gap-4 p-4">
+        <div className="flex-1 overflow-auto">
+          <div className="grid grid-cols-12 gap-4 p-4">
           <div className="col-span-12 rounded-xl border border-white/10 bg-[radial-gradient(circle_at_20%_10%,rgba(244,63,94,0.10),transparent_35%),radial-gradient(circle_at_80%_10%,rgba(125,211,252,0.08),transparent_40%)] bg-black/40 p-4">
             {children}
+          </div>
           </div>
         </div>
 
@@ -187,7 +216,6 @@ export default function PluginShell({ plugin, onChange, onClose, children }: Plu
             </button>
           </div>
         </div>
-      </div>
     </div>
   );
 }
