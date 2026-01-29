@@ -101,6 +101,7 @@ export default function TrackLane({
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(
     null,
   );
+  const [showPlugins, setShowPlugins] = useState(true);
 
   const fadeInDurationRef = useRef(fadeInDuration);
   const fadeOutDurationRef = useRef(fadeOutDuration);
@@ -705,6 +706,34 @@ export default function TrackLane({
             {track.file ? track.file.name : "Drop audio here"}
           </span>
         </div>
+
+        {/* Per-track plugin rack under level / faders */}
+        <div className="mt-2 border-t border-white/10 pt-2">
+          <div className="mb-1 flex items-center justify-between text-[10px] text-white/60">
+            <span>Plugins</span>
+            <button
+              type="button"
+              onClick={() => setShowPlugins((v) => !v)}
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] text-white/50 hover:bg-white/10"
+            >
+              <span aria-hidden="true">{showPlugins ? "👁" : "👁‍🗨"}</span>
+              <span>{showPlugins ? "Hide" : "Show"}</span>
+            </button>
+          </div>
+          {showPlugins && (
+            <TrackPluginRack
+              plugins={plugins || []}
+              onChange={(next) => {
+                if (!onPluginsChange) return;
+                onPluginsChange(track.id, next);
+              }}
+              onOpen={(plugin) => {
+                if (!onOpenPlugin) return;
+                onOpenPlugin(track.id, plugin);
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Waveform / Drop area with grid */}
@@ -834,20 +863,6 @@ export default function TrackLane({
           } ${isAudioSelected ? "ring-2 ring-red-400/80" : ""}`}
           style={{ transformOrigin: "center center" }}
         />
-
-        <div className="absolute inset-x-0 bottom-0 z-20 border-t border-white/10 bg-black/60 px-3 py-2">
-          <TrackPluginRack
-            plugins={plugins || []}
-            onChange={(next) => {
-              if (!onPluginsChange) return;
-              onPluginsChange(track.id, next);
-            }}
-            onOpen={(plugin) => {
-              if (!onOpenPlugin) return;
-              onOpenPlugin(track.id, plugin);
-            }}
-          />
-        </div>
       </div>
 
       {isContextMenuOpen && contextMenuPos && (

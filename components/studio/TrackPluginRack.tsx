@@ -8,7 +8,7 @@ type TrackPluginRackProps = {
   onOpen: (plugin: TrackPlugin) => void;
 };
 
-const MAX_SLOTS = 25;
+const MAX_SLOTS = 16;
 
 const AVAILABLE_PLUGIN_TYPES: PluginType[] = [
   "EQ",
@@ -55,8 +55,8 @@ export default function TrackPluginRack({ plugins, onChange, onOpen }: TrackPlug
   };
 
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="grid flex-1 grid-cols-5 gap-1">
+    <div className="flex items-start justify-between gap-2">
+      <div className="grid flex-1 grid-cols-4 gap-1">
         {Array.from({ length: MAX_SLOTS }).map((_, index) => {
           const plugin = sorted.find((p) => p.order === index);
           if (!plugin) {
@@ -64,13 +64,13 @@ export default function TrackPluginRack({ plugins, onChange, onOpen }: TrackPlug
               <button
                 key={index}
                 type="button"
-                className="h-8 rounded border border-dashed border-white/15 text-[10px] text-white/40 hover:border-white/40 hover:text-white/70"
+                className="h-7 rounded border border-dashed border-white/15 text-[10px] text-white/30 hover:border-white/40 hover:text-white/70"
                 onClick={() => {
                   if (!AVAILABLE_PLUGIN_TYPES.length) return;
                   handleAdd(AVAILABLE_PLUGIN_TYPES[0]);
                 }}
               >
-                + Empty
+                +
               </button>
             );
           }
@@ -120,13 +120,13 @@ export default function TrackPluginRack({ plugins, onChange, onOpen }: TrackPlug
           );
         })}
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 pl-1 border-l border-white/10">
         {AVAILABLE_PLUGIN_TYPES.map((type) => (
           <button
             key={type}
             type="button"
             onClick={() => handleAdd(type)}
-            className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/70 hover:border-red-500/70 hover:text-white"
+            className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/60 hover:border-red-500/70 hover:text-white"
           >
             + {type}
           </button>
