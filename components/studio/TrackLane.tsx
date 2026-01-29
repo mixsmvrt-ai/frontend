@@ -720,19 +720,18 @@ export default function TrackLane({
               <span>{showPlugins ? "Hide" : "Show"}</span>
             </button>
           </div>
-          {showPlugins && (
-            <TrackPluginRack
-              plugins={plugins || []}
-              onChange={(next) => {
-                if (!onPluginsChange) return;
-                onPluginsChange(track.id, next);
-              }}
-              onOpen={(plugin) => {
-                if (!onOpenPlugin) return;
-                onOpenPlugin(track.id, plugin);
-              }}
-            />
-          )}
+          <TrackPluginRack
+            plugins={plugins || []}
+            hidePlugins={!showPlugins}
+            onChange={(next) => {
+              if (!onPluginsChange) return;
+              onPluginsChange(track.id, next);
+            }}
+            onOpen={(plugin) => {
+              if (!onOpenPlugin) return;
+              onOpenPlugin(track.id, plugin);
+            }}
+          />
         </div>
       </div>
 
