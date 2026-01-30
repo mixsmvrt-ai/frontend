@@ -31,6 +31,7 @@ import {
 import type { PluginWindowPosition } from "../../components/studio/PluginWindow";
 import PluginWindow from "../../components/studio/PluginWindow";
 import StudioToolsPanel from "../../components/studio/StudioToolsPanel";
+import StudioToolsDropdown from "../../components/studio/StudioToolsDropdown";
 import type { StudioRegion, StudioTool } from "../../components/studio/tools/studioTools";
 import {
   concatAudioBuffers,
@@ -2114,18 +2115,14 @@ export default function MixStudio() {
         onSessionScaleChange={setSessionScale}
       />
 
-      <div className="flex flex-1 min-h-0 bg-black pb-28 sm:pb-0">
-        <div className="hidden sm:block">
-          <StudioToolsPanel
-            collapsed={toolsCollapsed}
-            onToggleCollapsed={() => setToolsCollapsed((p) => !p)}
-            activeTool={activeTool}
-            onChangeTool={setActiveTool}
-            selectedRegionSummary={selectedRegionSummary}
-            onChangeSelectedRegion={patchSelectedRegion}
-          />
-        </div>
+      <StudioToolsDropdown
+        activeTool={activeTool}
+        onChangeTool={setActiveTool}
+        selectedRegionSummary={selectedRegionSummary}
+        onChangeSelectedRegion={patchSelectedRegion}
+      />
 
+      <div className="flex flex-1 min-h-0 bg-black pb-28 sm:pb-0">
         <div className="flex-1 overflow-y-auto overflow-x-auto">
           <div className="min-w-[900px]">
             <Timeline
