@@ -1868,7 +1868,7 @@ export default function MixStudio() {
       </div>
     </div>
   ) : (
-    <div className="flex min-h-screen flex-col bg-black text-white sm:h-screen">
+    <div className="flex h-full min-h-0 flex-col bg-black text-white">
       <ProcessingOverlay
         state={processingOverlay}
         stages={overlayStages}
@@ -1983,7 +1983,7 @@ export default function MixStudio() {
         onSessionScaleChange={setSessionScale}
       />
 
-      <div className="flex-1 bg-black pb-28 sm:pb-0 flex">
+      <div className="flex flex-1 min-h-0 bg-black pb-28 sm:pb-0">
         <div className="hidden sm:block">
           <StudioToolsPanel
             collapsed={toolsCollapsed}
