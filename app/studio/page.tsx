@@ -1115,12 +1115,21 @@ export default function MixStudio() {
     // drives Supabase job rows and the UI, while the DSP service
     // handles the actual per-track processing below.
     try {
+      const selectedPresetMeta =
+        availablePresets.find((p) => p.id === selectedPresetId) ??
+        availablePresets[0] ??
+        null;
+
+      const backendTarget: "vocal" | "beat" | "full_mix" =
+        (selectedPresetMeta?.target as "vocal" | "beat" | "full_mix" | undefined) ||
+        "full_mix";
+
       const payload = {
         user_id: null as string | null,
         feature_type: featureType,
         job_type: jobType,
         preset_id: selectedPresetId,
-        target: "full_mix" as const,
+        target: backendTarget,
         input_files: {
           _meta: {
             display_name: "Studio session mix",
