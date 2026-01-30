@@ -3,7 +3,6 @@ import { Navbar } from "../components/Navbar";
 import { GlobalBackButton } from "../components/GlobalBackButton";
 import { Footer } from "../components/Footer";
 import { StudioFlowModalProvider } from "../components/StudioFlowModal";
-import { ConditionalFooter } from "../components/ConditionalFooter";
 
 export const metadata = {
   title: "MIXSMVRT · AI-Powered Mixing & Mastering",
@@ -22,8 +21,8 @@ export default function RootLayout({
           <div className="flex min-h-screen flex-col">
             <Navbar />
             <GlobalBackButton />
-            <div className="flex-1">{children}</div>
-            <ConditionalFooter />
+            <div className="flex-1 min-h-0">{children}</div>
+            <Footer />
           </div>
         </StudioFlowModalProvider>
       </body>
