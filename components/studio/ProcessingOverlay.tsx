@@ -92,6 +92,10 @@ interface ProcessingOverlayProps {
   onDownload?: () => void;
 }
 
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
 export function ProgressBar({
   value,
   label,
@@ -193,10 +197,90 @@ export function ProcessingOverlay({ state, stages, onCancel, onDownload }: Proce
   const stageList = stages && stages.length ? stages : PROCESSING_STAGES;
   const currentStage = stageList.find((s) => s.id === currentStageId);
 
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = React.useState<{ x: number; y: number }>({ x: 24, y: 80 });
+  const dragRef = React.useRef<
+    | {
+        pointerId: number;
+        startClientX: number;
+        startClientY: number;
+        startX: number;
+        startY: number;
+      }
+    | null
+  >(null);
+
+  const beginDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (target && target.closest("button,select,input,textarea,a,[data-no-drag]")) {
+      return;
+    }
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: position.x,
+      startY: position.y,
+    };
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // no-op
+    }
+    event.preventDefault();
+  };
+
+  const onDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (event.pointerId !== drag.pointerId) return;
+
+    const dx = event.clientX - drag.startClientX;
+    const dy = event.clientY - drag.startClientY;
+    const nextRaw = { x: drag.startX + dx, y: drag.startY + dy };
+
+    const margin = 8;
+    const rect = containerRef.current?.getBoundingClientRect();
+    const w = rect?.width ?? 520;
+    const h = rect?.height ?? 360;
+    const maxX = Math.max(margin, window.innerWidth - w - margin);
+    const maxY = Math.max(margin, window.innerHeight - h - margin);
+
+    const next = {
+      x: clamp(nextRaw.x, margin, maxX),
+      y: clamp(nextRaw.y, margin, maxY),
+    };
+
+    setPosition(next);
+  };
+
+  const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (event.pointerId !== drag.pointerId) return;
+    dragRef.current = null;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // no-op
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 px-4 backdrop-blur-md">
-      <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-[#0b0b0b]/95 p-4 shadow-[0_0_60px_rgba(0,0,0,0.85)] sm:p-5">
-        <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="fixed inset-0 z-40 pointer-events-none">
+      <div
+        ref={containerRef}
+        className="pointer-events-auto fixed w-full max-w-xl rounded-2xl border border-white/10 bg-[#0b0b0b]/95 p-4 shadow-[0_0_60px_rgba(0,0,0,0.85)] sm:p-5"
+        style={{ left: position.x, top: position.y }}
+      >
+        <div
+          className="mb-3 flex cursor-move items-center justify-between gap-3"
+          onPointerDown={beginDrag}
+          onPointerMove={onDragMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-red-400">
               {mode === "mix" ? "Processing Full Mix" : "Processing Track"}
