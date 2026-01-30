@@ -227,10 +227,12 @@ export default function MixStudio() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
-  const [autosaveMinutes, setAutosaveMinutes] = useState<number>(5);
+  const [autosaveMinutes, setAutosaveMinutes] = useState<number>(0);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isSavingProject, setIsSavingProject] = useState(false);
   const [hasLoadedProjectLayout, setHasLoadedProjectLayout] = useState(false);
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [saveDialogName, setSaveDialogName] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -397,7 +399,7 @@ export default function MixStudio() {
         setAutosaveMinutes(
           typeof data.autosave_interval_min === "number"
             ? data.autosave_interval_min
-            : 5,
+            : 0,
         );
         setLastSavedAt(data.last_saved_at ?? null);
 
@@ -1565,107 +1567,169 @@ export default function MixStudio() {
     primaryActionLabel = isProcessing ? "Processing Mix..." : "Process Full Mix";
   }
 
-  const handleSaveProject = useCallback(async () => {
-    if (!projectId) return;
-    if (!isSupabaseConfigured || !supabase) return;
+  const buildProjectMeta = useCallback(() => {
+    const trackLayout = tracks.map((track) => ({
+      id: track.id,
+      name: track.name,
+      role: track.role,
+      volume: track.volume,
+      pan: typeof track.pan === "number" ? track.pan : 0,
+      gender: track.gender,
+      muted: Boolean(track.muted),
+      solo: Boolean(track.solo),
+      processed: Boolean(track.processed),
+      regions: (track.regions || []).map((r) => ({
+        id: r.id,
+        start: r.start,
+        end: r.end,
+        name: r.name,
+        gainDb: typeof r.gainDb === "number" ? r.gainDb : 0,
+        pan: typeof r.pan === "number" ? r.pan : 0,
+        fadeInSec: typeof r.fadeInSec === "number" ? r.fadeInSec : 0,
+        fadeOutSec: typeof r.fadeOutSec === "number" ? r.fadeOutSec : 0,
+        stretchRate: typeof (r as any).stretchRate === "number" ? (r as any).stretchRate : 1,
+        automation: Array.isArray((r as any).automation) ? (r as any).automation : [],
+      })),
+      plugins: (track.plugins || []).map((plugin) => ({
+        id: plugin.id,
+        pluginId: plugin.pluginId,
+        pluginType: plugin.pluginType,
+        name: plugin.name,
+        order: plugin.order,
+        params: plugin.params,
+        aiParams: plugin.aiParams,
+        preset: plugin.preset,
+        enabled: plugin.enabled,
+        aiGenerated: plugin.aiGenerated,
+        locked: plugin.locked,
+      })),
+    }));
 
-    setIsSavingProject(true);
-    try {
-      const trackLayout = tracks.map((track) => ({
-        id: track.id,
-        name: track.name,
-        role: track.role,
-        volume: track.volume,
-        pan: typeof track.pan === "number" ? track.pan : 0,
-        gender: track.gender,
-        muted: Boolean(track.muted),
-        solo: Boolean(track.solo),
-        processed: Boolean(track.processed),
-        regions: (track.regions || []).map((r) => ({
-          id: r.id,
-          start: r.start,
-          end: r.end,
-          name: r.name,
-          gainDb: typeof r.gainDb === "number" ? r.gainDb : 0,
-          pan: typeof r.pan === "number" ? r.pan : 0,
-          fadeInSec: typeof r.fadeInSec === "number" ? r.fadeInSec : 0,
-          fadeOutSec: typeof r.fadeOutSec === "number" ? r.fadeOutSec : 0,
-          stretchRate: typeof (r as any).stretchRate === "number" ? (r as any).stretchRate : 1,
-          automation: Array.isArray((r as any).automation) ? (r as any).automation : [],
-        })),
-        plugins: (track.plugins || []).map((plugin) => ({
-          id: plugin.id,
-          pluginId: plugin.pluginId,
-          pluginType: plugin.pluginType,
-          name: plugin.name,
-          order: plugin.order,
-          params: plugin.params,
-          aiParams: plugin.aiParams,
-          preset: plugin.preset,
-          enabled: plugin.enabled,
-          aiGenerated: plugin.aiGenerated,
-          locked: plugin.locked,
-        })),
-      }));
-
-      const meta = {
-        bpm,
-        genre,
-        sessionKey,
-        sessionScale,
-        studioMode,
-        throwFxMode,
-        selectedPresetId,
-        tracks: trackLayout,
-      };
-
-      const now = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from("projects")
-        .update({
-          meta,
-          autosave_interval_min: autosaveMinutes,
-          last_saved_at: now,
-        })
-        .eq("id", projectId)
-        .select("status, last_saved_at, autosave_interval_min")
-        .single();
-
-      if (error) {
-        // eslint-disable-next-line no-console
-        console.error("Failed to save project", error);
-        return;
-      }
-
-      if (data) {
-        setProjectStatus(data.status ?? projectStatus);
-        setLastSavedAt(data.last_saved_at ?? now);
-        setAutosaveMinutes(
-          typeof data.autosave_interval_min === "number"
-            ? data.autosave_interval_min
-            : autosaveMinutes,
-        );
-      }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error("Error saving project", error);
-    } finally {
-      setIsSavingProject(false);
-    }
+    return {
+      bpm,
+      genre,
+      sessionKey,
+      sessionScale,
+      studioMode,
+      throwFxMode,
+      selectedPresetId,
+      tracks: trackLayout,
+    };
   }, [
-    projectId,
-    autosaveMinutes,
     bpm,
     genre,
     sessionKey,
     sessionScale,
     studioMode,
-    projectStatus,
-    tracks,
     throwFxMode,
     selectedPresetId,
+    tracks,
   ]);
+
+  const handleSaveProject = useCallback(
+    async () => {
+      if (!projectId) return;
+      if (!isSupabaseConfigured || !supabase) return;
+
+      setIsSavingProject(true);
+      try {
+        const meta = buildProjectMeta();
+        const now = new Date().toISOString();
+
+        const { data, error } = await supabase
+          .from("projects")
+          .update({
+            meta,
+            autosave_interval_min: autosaveMinutes,
+            last_saved_at: now,
+          })
+          .eq("id", projectId)
+          .select("status, last_saved_at, autosave_interval_min")
+          .single();
+
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to save project", error);
+          return;
+        }
+
+        if (data) {
+          setProjectStatus(data.status ?? projectStatus);
+          setLastSavedAt(data.last_saved_at ?? now);
+          setAutosaveMinutes(
+            typeof data.autosave_interval_min === "number"
+              ? data.autosave_interval_min
+              : autosaveMinutes,
+          );
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Error saving project", error);
+      } finally {
+        setIsSavingProject(false);
+      }
+    },
+    [
+      projectId,
+      isSupabaseConfigured,
+      supabase,
+      buildProjectMeta,
+      autosaveMinutes,
+      projectStatus,
+    ],
+  );
+
+  const handleCreateAndSaveProject = useCallback(
+    async (name: string) => {
+      if (!isSupabaseConfigured || !supabase) return;
+
+      setIsSavingProject(true);
+      try {
+        const meta = buildProjectMeta();
+        const now = new Date().toISOString();
+
+        const { data, error } = await supabase
+          .from("projects")
+          .insert({
+            name,
+            meta,
+            autosave_interval_min: autosaveMinutes,
+            last_saved_at: now,
+          })
+          .select("id, name, status, last_saved_at, autosave_interval_min")
+          .single();
+
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to create project", error);
+          return;
+        }
+
+        if (data) {
+          setProjectId(data.id ?? null);
+          setProjectName(data.name ?? name);
+          setProjectStatus(data.status ?? null);
+          setLastSavedAt(data.last_saved_at ?? now);
+          setAutosaveMinutes(
+            typeof data.autosave_interval_min === "number"
+              ? data.autosave_interval_min
+              : autosaveMinutes,
+          );
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Error creating project", error);
+      } finally {
+        setIsSavingProject(false);
+      }
+    },
+    [
+      autosaveMinutes,
+      buildProjectMeta,
+      isSupabaseConfigured,
+      supabase,
+    ],
+  );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1869,6 +1933,51 @@ export default function MixStudio() {
     </div>
   ) : (
     <div className="flex h-full min-h-0 flex-col bg-black text-white">
+      {isSaveDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-sm rounded-lg border border-white/10 bg-zinc-950 p-4 shadow-xl">
+            <h2 className="text-sm font-semibold text-white">Save project</h2>
+            <p className="mt-1 text-[11px] text-white/60">
+              Name this session so you can find it later in your dashboard.
+            </p>
+            <div className="mt-3">
+              <label className="block text-[11px] text-white/60">
+                Project name
+                <input
+                  type="text"
+                  value={saveDialogName}
+                  onChange={(event) => setSaveDialogName(event.target.value)}
+                  className="mt-1 w-full rounded-md border border-white/15 bg-black px-2 py-1.5 text-[13px] text-white outline-none focus:border-white/40"
+                  autoFocus
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end gap-2 text-[12px]">
+              <button
+                type="button"
+                onClick={() => setIsSaveDialogOpen(false)}
+                className="rounded-full border border-white/15 bg-black px-3 py-1.5 text-white/70 hover:border-white/40 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const trimmed = saveDialogName.trim();
+                  if (!trimmed) return;
+                  await handleCreateAndSaveProject(trimmed);
+                  setIsSaveDialogOpen(false);
+                }}
+                disabled={isSavingProject || !saveDialogName.trim().length}
+                className="rounded-full bg-white px-3 py-1.5 font-medium text-black shadow-[0_0_14px_rgba(255,255,255,0.35)] disabled:cursor-not-allowed disabled:bg-white/70"
+              >
+                {isSavingProject ? "Saving..." : "Save project"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ProcessingOverlay
         state={processingOverlay}
         stages={overlayStages}
@@ -1883,88 +1992,110 @@ export default function MixStudio() {
         }
       />
 
-      {projectId && (
-        <div className="border-b border-white/10 bg-black/90">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-2 text-xs">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 truncate rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-white/80"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
-                <span className="text-white/60">Project</span>
-                <span className="truncate font-medium text-white">
-                  {projectName || "Untitled session"}
-                </span>
-                <span className="text-[9px] text-white/40" aria-hidden="true">
-                  ▾
-                </span>
-              </button>
-              {projectStatus && (
-                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-white/50">
-                  {projectStatus}
-                </span>
-              )}
-              {lastSavedAt && (
-                <span className="text-[11px] text-white/50">
-                  Saved {new Date(lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              )}
-            </div>
+      {(() => {
+        const baseName = projectName && projectName.trim().length > 0 ? projectName : null;
+        const derivedName = !baseName
+          ? !projectId && autosaveMinutes > 0
+            ? "Untitled"
+            : !projectId && autosaveMinutes <= 0
+              ? "Unsaved"
+              : "Untitled session"
+          : baseName;
 
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
+        return (
+          <div className="border-b border-white/10 bg-black/90">
+            <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-2 text-xs">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={handleUndo}
-                  disabled={!canUndo}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 text-[11px] text-white/70 hover:border-white/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Undo last processing"
+                  className="inline-flex items-center gap-2 truncate rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-white/80"
                 >
-                  ⟲
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                  <span className="text-white/60">Project</span>
+                  <span className="truncate font-medium text-white">
+                    {derivedName}
+                  </span>
+                  <span className="text-[9px] text-white/40" aria-hidden="true">
+                    ▾
+                  </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={handleRedo}
-                  disabled={!canRedo}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 text-[11px] text-white/70 hover:border-white/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Redo processing"
-                >
-                  ⟳
-                </button>
+                {projectStatus && (
+                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-white/50">
+                    {projectStatus}
+                  </span>
+                )}
+                {lastSavedAt && (
+                  <span className="text-[11px] text-white/50">
+                    Saved {new Date(lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                )}
               </div>
-              <div className="flex items-center gap-1 text-[11px] text-white/60">
-                <span>Autosave</span>
-                <select
-                  className="rounded-full border border-white/15 bg-black px-2 py-1 text-[11px] text-white/90 outline-none"
-                  value={autosaveMinutes}
-                  onChange={(event) => {
-                    const value = Number(event.target.value);
-                    // Allow 0 as "Off"
-                    setAutosaveMinutes(Number.isFinite(value) ? value : 0);
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleUndo}
+                    disabled={!canUndo}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 text-[11px] text-white/70 hover:border-white/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Undo last processing"
+                  >
+                    ⟲
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRedo}
+                    disabled={!canRedo}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 text-[11px] text-white/70 hover:border-white/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Redo processing"
+                  >
+                    ⟳
+                  </button>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] text-white/60">
+                  <span>Autosave</span>
+                  <select
+                    className="rounded-full border border-white/15 bg-black px-2 py-1 text-[11px] text-white/90 outline-none"
+                    value={autosaveMinutes}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      // Allow 0 as "Off"
+                      setAutosaveMinutes(Number.isFinite(value) ? value : 0);
+                    }}
+                  >
+                    <option value={0}>Off</option>
+                    <option value={1}>Every 1 min</option>
+                    <option value={5}>Every 5 min</option>
+                    <option value={10}>Every 10 min</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!projectId) {
+                      const base = projectName && projectName.trim().length > 0
+                        ? projectName
+                        : autosaveMinutes > 0
+                          ? "Untitled"
+                          : "Unsaved";
+                      setSaveDialogName(base);
+                      setIsSaveDialogOpen(true);
+                      return;
+                    }
+
+                    void handleSaveProject();
                   }}
+                  disabled={isSavingProject}
+                  className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[11px] font-medium text-black shadow-[0_0_16px_rgba(255,255,255,0.3)] disabled:cursor-not-allowed disabled:bg-white/70"
                 >
-                  <option value={0}>Off</option>
-                  <option value={1}>Every 1 min</option>
-                  <option value={5}>Every 5 min</option>
-                  <option value={10}>Every 10 min</option>
-                </select>
+                  {isSavingProject ? "Saving..." : "Save"}
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  void handleSaveProject();
-                }}
-                disabled={isSavingProject}
-                className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[11px] font-medium text-black shadow-[0_0_16px_rgba(255,255,255,0.3)] disabled:cursor-not-allowed disabled:bg-white/70"
-              >
-                {isSavingProject ? "Saving..." : "Save"}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <TransportBar
         isPlaying={isPlaying}
