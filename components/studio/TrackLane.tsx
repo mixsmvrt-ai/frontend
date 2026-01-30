@@ -2,10 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
+import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
 import type { TrackType } from "../../app/studio/page";
 import type { TrackPlugin } from "./pluginTypes";
 import TrackPluginRack from "./TrackPluginRack";
 import { buildWebAudioFiltersForPlugins } from "./plugins/runtime/webAudioFilters";
+import {
+  barSeconds,
+  clamp,
+  dbToGain,
+  snapTimeToGrid,
+  type GridResolution,
+  type StudioRegion,
+  type StudioTool,
+} from "./tools/studioTools";
 
 const ROLE_ACCENT_COLORS: Record<TrackType["role"], string> = {
   beat: "#22c55e",
@@ -29,6 +39,13 @@ type TrackLaneProps = {
   zoom: number;
   isPlaying: boolean;
   masterVolume: number;
+  activeTool?: StudioTool;
+  gridResolution?: GridResolution;
+  bpm?: number;
+  regions?: StudioRegion[];
+  onRegionsChange?: (trackId: string, regions: StudioRegion[]) => void;
+  selectedRegionId?: string | null;
+  onSelectRegion?: (trackId: string, regionId: string | null) => void;
   onFileSelected: (trackId: string, file: File) => void;
   onVolumeChange: (trackId: string, volume: number) => void;
   onLevelChange: (trackId: string, level: number) => void;
@@ -54,6 +71,13 @@ export default function TrackLane({
   track,
   zoom,
   isPlaying,
+  activeTool = "select",
+  gridResolution = "1/4",
+  bpm = 120,
+  regions = [],
+  onRegionsChange,
+  selectedRegionId,
+  onSelectRegion,
   onFileSelected,
   masterVolume,
   onVolumeChange,
@@ -77,6 +101,16 @@ export default function TrackLane({
 }: TrackLaneProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const regionsPluginRef = useRef<RegionsPlugin | null>(null);
+  const lastRegionClickAtRef = useRef<number>(0);
+  const activeToolRef = useRef<StudioTool>(activeTool);
+  const bpmRef = useRef<number>(bpm);
+  const gridResolutionRef = useRef<GridResolution>(gridResolution);
+  const regionsRef = useRef<StudioRegion[]>(regions);
+  const selectedRegionIdRef = useRef<string | null | undefined>(selectedRegionId);
+  const onSelectRegionRef = useRef<typeof onSelectRegion>(onSelectRegion);
+  const onRegionsChangeRef = useRef<typeof onRegionsChange>(onRegionsChange);
+  const trackPanRef = useRef<number>(track.pan ?? 0);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const pannerRef = useRef<StereoPannerNode | null>(null);
   const backendRef = useRef<any>(null);
@@ -107,6 +141,56 @@ export default function TrackLane({
     null,
   );
   const [showPlugins, setShowPlugins] = useState(true);
+
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+  }, [activeTool]);
+
+  useEffect(() => {
+    bpmRef.current = bpm;
+  }, [bpm]);
+
+  useEffect(() => {
+    gridResolutionRef.current = gridResolution;
+  }, [gridResolution]);
+
+  useEffect(() => {
+    regionsRef.current = Array.isArray(regions) ? regions : [];
+  }, [regions]);
+
+  useEffect(() => {
+    selectedRegionIdRef.current = selectedRegionId;
+  }, [selectedRegionId]);
+
+  useEffect(() => {
+    onSelectRegionRef.current = onSelectRegion;
+  }, [onSelectRegion]);
+
+  useEffect(() => {
+    onRegionsChangeRef.current = onRegionsChange;
+  }, [onRegionsChange]);
+
+  useEffect(() => {
+    trackPanRef.current = track.pan ?? 0;
+  }, [track.pan]);
+
+  const updateRegionArray = useCallback(
+    (nextRegions: StudioRegion[]) => {
+      const handler = onRegionsChangeRef.current;
+      if (!handler) return;
+      const normalized = nextRegions
+        .filter((r) => r && Number.isFinite(r.start) && Number.isFinite(r.end))
+        .map((r) => ({
+          ...r,
+          start: Math.max(0, r.start),
+          end: Math.max(0, r.end),
+        }))
+        .filter((r) => r.end > r.start)
+        .sort((a, b) => a.start - b.start);
+      handler(track.id, normalized);
+    },
+    [track.id],
+  );
 
   const fadeInDurationRef = useRef(fadeInDuration);
   const fadeOutDurationRef = useRef(fadeOutDuration);
@@ -187,6 +271,89 @@ export default function TrackLane({
     ws.setVolume(track.volume * masterVolume);
     wavesurferRef.current = ws;
 
+    const regionsPlugin = ws.registerPlugin(RegionsPlugin.create());
+    regionsPluginRef.current = regionsPlugin;
+
+    const setPluginRegionInteractivity = () => {
+      const plugin = regionsPluginRef.current;
+      if (!plugin) return;
+      const tool = activeToolRef.current;
+      const allowDrag = tool === "select";
+      const allowResize = tool === "select" || tool === "trim";
+      plugin.getRegions().forEach((reg) => {
+        reg.setOptions({
+          drag: allowDrag,
+          resize: allowResize,
+          resizeStart: allowResize,
+          resizeEnd: allowResize,
+        });
+      });
+    };
+
+    const syncRegionsToPlugin = (next: StudioRegion[]) => {
+      const plugin = regionsPluginRef.current;
+      if (!plugin) return;
+      plugin.clearRegions();
+
+      const color = `${accentColor}33`;
+      const tool = activeToolRef.current;
+      next.forEach((r) => {
+        plugin.addRegion({
+          id: r.id,
+          start: r.start,
+          end: r.end,
+          color,
+          drag: tool === "select",
+          resize: tool === "select" || tool === "trim",
+          resizeStart: tool === "select" || tool === "trim",
+          resizeEnd: tool === "select" || tool === "trim",
+        });
+      });
+    };
+
+    const handleRegionClicked = (region: any, e: MouseEvent) => {
+      e.stopPropagation();
+      lastRegionClickAtRef.current = Date.now();
+      onSelectRegionRef.current?.(track.id, region?.id ?? null);
+    };
+
+    const handleRegionUpdated = (region: any) => {
+      const list = regionsRef.current;
+      const existing = list.find((r) => r.id === region.id);
+      if (!existing) return;
+
+      let nextStart = typeof region.start === "number" ? region.start : existing.start;
+      let nextEnd = typeof region.end === "number" ? region.end : existing.end;
+
+      // Snap only when trimming.
+      if (activeToolRef.current === "trim") {
+        nextStart = snapTimeToGrid(nextStart, bpmRef.current, gridResolutionRef.current);
+        nextEnd = snapTimeToGrid(nextEnd, bpmRef.current, gridResolutionRef.current);
+        // Ensure at least one grid step long.
+        const minLen = Math.max(0.01, (60 / Math.max(1, bpmRef.current)) * 0.25);
+        if (nextEnd - nextStart < minLen) {
+          nextEnd = nextStart + minLen;
+        }
+        // Reflect snapped values visually.
+        region.setOptions({ start: nextStart, end: nextEnd });
+      }
+
+      updateRegionArray(
+        list.map((r) =>
+          r.id === region.id
+            ? {
+                ...r,
+                start: nextStart,
+                end: nextEnd,
+              }
+            : r,
+        ),
+      );
+    };
+
+    regionsPlugin.on("region-clicked", handleRegionClicked);
+    regionsPlugin.on("region-updated", handleRegionUpdated);
+
     const handleAudioProcess = (currentTime: number) => {
       const duration = trackDuration || ws.getDuration() || 0;
       let fadeFactor = 1;
@@ -215,7 +382,37 @@ export default function TrackLane({
         Math.min(1, baseVolumeRef.current * masterVolumeRef.current),
       );
       const audibleVolume = audibleRef.current ? baseVolume : 0;
-      ws.setVolume(audibleVolume * fadeFactor);
+
+      const list = regionsRef.current;
+      const r =
+        list.find((region) => currentTime >= region.start && currentTime <= region.end) ??
+        null;
+      const regionGainDb = typeof r?.gainDb === "number" ? r.gainDb : 0;
+      const regionGain = dbToGain(regionGainDb);
+
+      // Region fades (optional)
+      if (r) {
+        const fadeInSec = typeof r.fadeInSec === "number" ? r.fadeInSec : 0;
+        const fadeOutSec = typeof r.fadeOutSec === "number" ? r.fadeOutSec : 0;
+        const localT = currentTime - r.start;
+        const regionDur = r.end - r.start;
+        if (fadeInSec > 0 && localT >= 0 && localT < fadeInSec) {
+          fadeFactor *= clamp(localT / fadeInSec, 0, 1);
+        }
+        if (fadeOutSec > 0 && regionDur > 0 && localT > regionDur - fadeOutSec) {
+          const remaining = regionDur - localT;
+          fadeFactor *= clamp(remaining / fadeOutSec, 0, 1);
+        }
+
+        const regionPan = typeof r.pan === "number" ? r.pan : 0;
+        if (pannerRef.current) {
+          pannerRef.current.pan.value = clamp(trackPanRef.current + regionPan, -1, 1);
+        }
+      } else if (pannerRef.current) {
+        pannerRef.current.pan.value = clamp(trackPanRef.current, -1, 1);
+      }
+
+      ws.setVolume(audibleVolume * fadeFactor * regionGain);
     };
 
     ws.on("audioprocess", handleAudioProcess);
@@ -297,7 +494,71 @@ export default function TrackLane({
           detail: { id: track.id, duration },
         }),
       );
+      // Paint existing regions after decode/ready.
+        syncRegionsToPlugin(regionsRef.current);
+      setPluginRegionInteractivity();
     });
+
+    // Slice tool: click on waveform to split selected region (or create a new region).
+    const handleWaveformClick = (relativeX: number) => {
+      if (activeToolRef.current !== "slice") return;
+      if (Date.now() - lastRegionClickAtRef.current < 80) return;
+
+      const duration = ws.getDuration() || 0;
+      if (duration <= 0) return;
+      const time = clamp(relativeX, 0, 1) * duration;
+      const t = snapTimeToGrid(time, bpmRef.current, gridResolutionRef.current);
+
+      const list = regionsRef.current;
+      const selectedId = selectedRegionIdRef.current;
+      const selected = selectedId
+        ? list.find((r) => r.id === selectedId) ?? null
+        : null;
+      const target =
+        selected && t > selected.start && t < selected.end
+          ? selected
+          : list.find((r) => t > r.start && t < r.end) ?? null;
+
+      if (target) {
+        // Avoid tiny slices.
+        if (t - target.start < 0.01 || target.end - t < 0.01) return;
+        const left: StudioRegion = {
+          ...target,
+          id: crypto.randomUUID(),
+          end: t,
+        };
+        const right: StudioRegion = {
+          ...target,
+          id: crypto.randomUUID(),
+          start: t,
+        };
+        updateRegionArray(list.flatMap((r) => (r.id === target.id ? [left, right] : [r])));
+        onSelectRegionRef.current?.(track.id, left.id);
+        return;
+      }
+
+      // No region under cursor: create a 1-bar clip.
+      const len = barSeconds(bpmRef.current);
+      const start = t;
+      const end = clamp(t + len, 0, duration);
+      if (end - start < 0.02) return;
+      const created: StudioRegion = {
+        id: crypto.randomUUID(),
+        start,
+        end,
+        gainDb: 0,
+        pan: 0,
+        fadeInSec: 0,
+        fadeOutSec: 0,
+      };
+      updateRegionArray([...list, created]);
+      onSelectRegionRef.current?.(track.id, created.id);
+    };
+
+    ws.on("click", handleWaveformClick);
+
+    // Keep region interactivity in sync with tool changes.
+    setPluginRegionInteractivity();
 
     return () => {
       if (pluginApplyRafRef.current != null) {
@@ -317,6 +578,8 @@ export default function TrackLane({
         pluginFiltersCleanupRef.current = null;
       }
       ws.un("audioprocess", handleAudioProcess);
+      ws.un("click", handleWaveformClick);
+      regionsPluginRef.current = null;
 
       const destroyResult = ws.destroy();
       // WaveSurfer.destroy may return void or a Promise; if it's a Promise,
@@ -335,7 +598,7 @@ export default function TrackLane({
       wavesurferRef.current = null;
       URL.revokeObjectURL(objectUrl);
     };
-  }, [track.file, onLevelChange, track.id]);
+  }, [track.file, onLevelChange, track.id, updateRegionArray]);
 
   // Rebuild plugin filter graph when plugins change.
   useEffect(() => {
@@ -369,6 +632,27 @@ export default function TrackLane({
       backend.setFilters(filters);
     });
   }, [plugins]);
+
+  // Sync region visuals when the region list or tool changes.
+  useEffect(() => {
+    const plugin = regionsPluginRef.current;
+    if (!plugin) return;
+
+    const color = `${accentColor}33`;
+    plugin.clearRegions();
+    (Array.isArray(regions) ? regions : []).forEach((r) => {
+      plugin.addRegion({
+        id: r.id,
+        start: r.start,
+        end: r.end,
+        color,
+        drag: activeTool === "select",
+        resize: activeTool === "select" || activeTool === "trim",
+        resizeStart: activeTool === "select" || activeTool === "trim",
+        resizeEnd: activeTool === "select" || activeTool === "trim",
+      });
+    });
+  }, [regions, activeTool, accentColor]);
 
   // React to zoom changes
   useEffect(() => {
