@@ -46,6 +46,7 @@ type TrackLaneProps = {
   onRegionsChange?: (trackId: string, regions: StudioRegion[]) => void;
   selectedRegionId?: string | null;
   onSelectRegion?: (trackId: string, regionId: string | null) => void;
+  onCommitStretch?: (trackId: string, regionId: string, stretchRate: number) => void;
   onFileSelected: (trackId: string, file: File) => void;
   onVolumeChange: (trackId: string, volume: number) => void;
   onLevelChange: (trackId: string, level: number) => void;
@@ -78,6 +79,7 @@ export default function TrackLane({
   onRegionsChange,
   selectedRegionId,
   onSelectRegion,
+  onCommitStretch,
   onFileSelected,
   masterVolume,
   onVolumeChange,
@@ -142,6 +144,60 @@ export default function TrackLane({
   );
   const [showPlugins, setShowPlugins] = useState(true);
 
+  const toolDragRef = useRef<
+    | null
+    | {
+        tool: StudioTool;
+        pointerId: number;
+        startClientX: number;
+        startClientY: number;
+        startGainDb: number;
+        startPan: number;
+        startFadeIn: number;
+        startFadeOut: number;
+        startStretchRate: number;
+        currentStretchRate: number;
+        targetRegionId: string | null;
+        fadeSide: "in" | "out" | null;
+      }
+  >(null);
+
+  const sortedAutomation = (points: { t: number; v: number }[]) => {
+    return points
+      .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v))
+      .map((p) => ({ t: p.t, v: clamp(p.v, 0, 1) }))
+      .sort((a, b) => a.t - b.t);
+  };
+
+  const automationValueAt = (
+    points: { t: number; v: number }[] | undefined,
+    t: number,
+  ): number => {
+    if (!points || points.length === 0) return 1;
+    if (points.length === 1) return clamp(points[0].v, 0, 1);
+
+    // Find surrounding points
+    let left = points[0];
+    let right = points[points.length - 1];
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      if (t >= a.t && t <= b.t) {
+        left = a;
+        right = b;
+        break;
+      }
+    }
+
+    if (t <= left.t) return clamp(left.v, 0, 1);
+    if (t >= right.t) return clamp(right.v, 0, 1);
+
+    const span = right.t - left.t;
+    if (span <= 0) return clamp(right.v, 0, 1);
+    const alpha = clamp((t - left.t) / span, 0, 1);
+    return clamp(left.v + (right.v - left.v) * alpha, 0, 1);
+  };
+
   useEffect(() => {
     activeToolRef.current = activeTool;
   }, [activeTool]);
@@ -190,6 +246,55 @@ export default function TrackLane({
       handler(track.id, normalized);
     },
     [track.id],
+  );
+
+  const ensureSelectedRegionAtTime = useCallback(
+    (timeSec: number, duration: number): StudioRegion | null => {
+      const list = regionsRef.current;
+      const existing =
+        list.find((r) => timeSec >= r.start && timeSec <= r.end) ?? null;
+
+      if (existing) {
+        onSelectRegionRef.current?.(track.id, existing.id);
+        return existing;
+      }
+
+      // If no region exists under cursor, create a 1-bar region.
+      const start = snapTimeToGrid(
+        timeSec,
+        bpmRef.current,
+        gridResolutionRef.current,
+      );
+      const end = clamp(start + barSeconds(bpmRef.current), 0, duration);
+      if (!(end > start)) return null;
+
+      const created: StudioRegion = {
+        id: crypto.randomUUID(),
+        start,
+        end,
+        gainDb: 0,
+        pan: 0,
+        fadeInSec: 0,
+        fadeOutSec: 0,
+        stretchRate: 1,
+        automation: [],
+      };
+
+      updateRegionArray([...list, created]);
+      onSelectRegionRef.current?.(track.id, created.id);
+      return created;
+    },
+    [track.id, updateRegionArray],
+  );
+
+  const patchRegion = useCallback(
+    (regionId: string, patch: Partial<StudioRegion>) => {
+      const list = regionsRef.current;
+      updateRegionArray(
+        list.map((r) => (r.id === regionId ? { ...r, ...patch } : r)),
+      );
+    },
+    [updateRegionArray],
   );
 
   const fadeInDurationRef = useRef(fadeInDuration);
@@ -390,6 +495,10 @@ export default function TrackLane({
       const regionGainDb = typeof r?.gainDb === "number" ? r.gainDb : 0;
       const regionGain = dbToGain(regionGainDb);
 
+      const automationGain = Array.isArray((r as any)?.automation)
+        ? automationValueAt((r as any).automation as any, currentTime)
+        : 1;
+
       // Region fades (optional)
       if (r) {
         const fadeInSec = typeof r.fadeInSec === "number" ? r.fadeInSec : 0;
@@ -412,7 +521,7 @@ export default function TrackLane({
         pannerRef.current.pan.value = clamp(trackPanRef.current, -1, 1);
       }
 
-      ws.setVolume(audibleVolume * fadeFactor * regionGain);
+      ws.setVolume(audibleVolume * fadeFactor * regionGain * automationGain);
     };
 
     ws.on("audioprocess", handleAudioProcess);
@@ -653,6 +762,187 @@ export default function TrackLane({
       });
     });
   }, [regions, activeTool, accentColor]);
+
+  const buildAutomationPath = useCallback(
+    (region: StudioRegion, duration: number): string | null => {
+      const points = sortedAutomation(
+        Array.isArray((region as any).automation) ? ((region as any).automation as any) : [],
+      );
+      if (!points.length || duration <= 0) return null;
+
+      const coords = points
+        .map((p) => {
+          const x = clamp((p.t / duration) * 100, 0, 100);
+          const y = clamp((1 - p.v) * 100, 0, 100);
+          return { x, y };
+        })
+        .sort((a, b) => a.x - b.x);
+
+      const d = coords
+        .map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(3)} ${c.y.toFixed(3)}`)
+        .join(" ");
+      return d;
+    },
+    [],
+  );
+
+  const handleToolPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!track.file || !wavesurferRef.current) return;
+
+      const tool = activeToolRef.current;
+      if (
+        tool !== "gain" &&
+        tool !== "pan" &&
+        tool !== "fade" &&
+        tool !== "automation" &&
+        tool !== "stretch"
+      ) {
+        return;
+      }
+
+      const ws = wavesurferRef.current;
+      const duration = trackDuration || ws.getDuration() || 0;
+      if (duration <= 0) return;
+
+      const el = e.currentTarget;
+      const rect = el.getBoundingClientRect();
+      const x01 = clamp((e.clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+      const y01 = clamp((e.clientY - rect.top) / Math.max(1, rect.height), 0, 1);
+      const time = x01 * duration;
+
+      const region = ensureSelectedRegionAtTime(time, duration);
+      if (!region) return;
+
+      // Determine fade side (for Fade tool)
+      let fadeSide: "in" | "out" | null = null;
+      if (tool === "fade") {
+        const local = clamp((time - region.start) / Math.max(0.001, region.end - region.start), 0, 1);
+        fadeSide = local < 0.5 ? "in" : "out";
+      }
+
+      toolDragRef.current = {
+        tool,
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startGainDb: typeof region.gainDb === "number" ? region.gainDb : 0,
+        startPan: typeof region.pan === "number" ? region.pan : 0,
+        startFadeIn: typeof region.fadeInSec === "number" ? region.fadeInSec : 0,
+        startFadeOut: typeof region.fadeOutSec === "number" ? region.fadeOutSec : 0,
+        startStretchRate: typeof (region as any).stretchRate === "number" ? (region as any).stretchRate : 1,
+        currentStretchRate: typeof (region as any).stretchRate === "number" ? (region as any).stretchRate : 1,
+        targetRegionId: region.id,
+        fadeSide,
+      };
+
+      // Automation creates/updates points immediately on down.
+      if (tool === "automation") {
+        const snappedT = snapTimeToGrid(time, bpmRef.current, gridResolutionRef.current);
+        const v = clamp(1 - y01, 0, 1);
+        const existing = Array.isArray((region as any).automation)
+          ? ((region as any).automation as any)
+          : [];
+        const next = sortedAutomation([
+          ...existing.filter((p: any) => Math.abs(p.t - snappedT) > 0.02),
+          { t: snappedT, v },
+        ]);
+        patchRegion(region.id, { automation: next } as any);
+      }
+
+      (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    [ensureSelectedRegionAtTime, patchRegion, track.file, trackDuration],
+  );
+
+  const handleToolPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const drag = toolDragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      if (!wavesurferRef.current) return;
+      const duration = trackDuration || wavesurferRef.current.getDuration() || 0;
+      if (duration <= 0) return;
+
+      const regionId = drag.targetRegionId;
+      if (!regionId) return;
+
+      const dx = e.clientX - drag.startClientX;
+      const dy = e.clientY - drag.startClientY;
+
+      const el = e.currentTarget;
+      const rect = el.getBoundingClientRect();
+      const x01 = clamp((e.clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+      const y01 = clamp((e.clientY - rect.top) / Math.max(1, rect.height), 0, 1);
+      const time = x01 * duration;
+
+      if (drag.tool === "gain") {
+        const nextDb = clamp(drag.startGainDb + (-dy / 8), -24, 12);
+        patchRegion(regionId, { gainDb: nextDb });
+      }
+
+      if (drag.tool === "pan") {
+        const nextPan = clamp(drag.startPan + dx / 250, -1, 1);
+        patchRegion(regionId, { pan: nextPan });
+      }
+
+      if (drag.tool === "fade") {
+        const list = regionsRef.current;
+        const r = list.find((rr) => rr.id === regionId);
+        if (!r) return;
+        const localT = clamp(time - r.start, 0, Math.max(0.001, r.end - r.start));
+        if (drag.fadeSide === "in") {
+          patchRegion(regionId, { fadeInSec: clamp(localT, 0, 3) });
+        } else if (drag.fadeSide === "out") {
+          const remaining = clamp(r.end - time, 0, Math.max(0.001, r.end - r.start));
+          patchRegion(regionId, { fadeOutSec: clamp(remaining, 0, 3) });
+        }
+      }
+
+      if (drag.tool === "stretch") {
+        const nextRate = clamp(drag.startStretchRate + dx / 220, 0.5, 2);
+        drag.currentStretchRate = nextRate;
+        patchRegion(regionId, { stretchRate: nextRate } as any);
+      }
+
+      if (drag.tool === "automation") {
+        const list = regionsRef.current;
+        const r = list.find((rr) => rr.id === regionId);
+        if (!r) return;
+        const snappedT = snapTimeToGrid(time, bpmRef.current, gridResolutionRef.current);
+        const v = clamp(1 - y01, 0, 1);
+        const existing = Array.isArray((r as any).automation) ? ((r as any).automation as any) : [];
+        const next = sortedAutomation([
+          ...existing.filter((p: any) => Math.abs(p.t - snappedT) > 0.02),
+          { t: snappedT, v },
+        ]);
+        patchRegion(regionId, { automation: next } as any);
+      }
+
+      e.preventDefault();
+    },
+    [patchRegion, trackDuration],
+  );
+
+  const handleToolPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = toolDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+
+    if (drag.tool === "stretch" && drag.targetRegionId) {
+      const rate = drag.currentStretchRate;
+      if (onCommitStretch && rate && Math.abs(rate - 1) > 0.01) {
+        onCommitStretch(track.id, drag.targetRegionId, rate);
+      }
+    }
+
+    toolDragRef.current = null;
+    try {
+      (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+  }, [onCommitStretch, track.id]);
 
   // React to zoom changes
   useEffect(() => {
@@ -1209,6 +1499,55 @@ export default function TrackLane({
           } ${isAudioSelected ? "ring-2 ring-red-400/80" : ""}`}
           style={{ transformOrigin: "center center" }}
         />
+
+        {/* Tool overlay (gain/pan/fade/stretch/automation) */}
+        {track.file && trackDuration > 0 && (
+          <div
+            className={`absolute inset-0 z-30 ${
+              ["gain", "pan", "fade", "automation", "stretch"].includes(activeTool)
+                ? "pointer-events-auto"
+                : "pointer-events-none"
+            }`}
+            onPointerDown={handleToolPointerDown}
+            onPointerMove={handleToolPointerMove}
+            onPointerUp={handleToolPointerUp}
+          >
+            {/* Automation curve for selected region */}
+            {selectedRegionId && (
+              (() => {
+                const r = (Array.isArray(regions) ? regions : []).find(
+                  (rr) => rr.id === selectedRegionId,
+                );
+                if (!r) return null;
+                const d = buildAutomationPath(r, trackDuration);
+                if (!d) return null;
+                return (
+                  <svg
+                    className="absolute inset-0"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                  >
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke="rgba(248,113,113,0.9)"
+                      strokeWidth={1.6}
+                    />
+                  </svg>
+                );
+              })()
+            )}
+
+            {/* Tool hint */}
+            <div className="pointer-events-none absolute right-2 bottom-2 rounded bg-black/60 px-2 py-1 text-[10px] text-white/70 border border-white/10">
+              {activeTool === "gain" && "Gain: drag up/down"}
+              {activeTool === "pan" && "Pan: drag left/right"}
+              {activeTool === "fade" && "Fade: drag start/end"}
+              {activeTool === "automation" && "Automation: draw"}
+              {activeTool === "stretch" && "Stretch: drag left/right"}
+            </div>
+          </div>
+        )}
       </div>
 
       {isContextMenuOpen && contextMenuPos && (

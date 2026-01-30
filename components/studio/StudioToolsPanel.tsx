@@ -38,12 +38,16 @@ export default function StudioToolsPanel({
     pan: number;
     fadeInSec: number;
     fadeOutSec: number;
+    stretchRate: number;
+    automationPoints: number;
   } | null;
   onChangeSelectedRegion?: (patch: {
     gainDb?: number;
     pan?: number;
     fadeInSec?: number;
     fadeOutSec?: number;
+    stretchRate?: number;
+    automation?: { t: number; v: number }[];
   }) => void;
 }) {
   return (
@@ -172,6 +176,38 @@ export default function StudioToolsPanel({
                     onChange={(e) => onChangeSelectedRegion({ fadeOutSec: Number(e.target.value) })}
                   />
                 </label>
+              </div>
+
+              <label className="grid gap-1">
+                <div className="flex items-center justify-between text-[11px] text-white/60">
+                  <span>Time Stretch</span>
+                  <span className="tabular-nums text-white/50">
+                    {selectedRegionSummary.stretchRate.toFixed(2)}x
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={2}
+                  step={0.01}
+                  value={selectedRegionSummary.stretchRate}
+                  onChange={(e) =>
+                    onChangeSelectedRegion({ stretchRate: Number(e.target.value) })
+                  }
+                />
+              </label>
+
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] text-white/60">
+                  Automation points: {selectedRegionSummary.automationPoints}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onChangeSelectedRegion({ automation: [] })}
+                  className="rounded-md border border-white/10 bg-black/40 px-2 py-1 text-[11px] text-white/70 hover:border-white/25 hover:text-white"
+                >
+                  Clear
+                </button>
               </div>
             </div>
           </div>
