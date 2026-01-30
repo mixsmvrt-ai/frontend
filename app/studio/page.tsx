@@ -32,6 +32,12 @@ import type { PluginWindowPosition } from "../../components/studio/PluginWindow"
 import PluginWindow from "../../components/studio/PluginWindow";
 import StudioToolsPanel from "../../components/studio/StudioToolsPanel";
 import type { StudioRegion, StudioTool } from "../../components/studio/tools/studioTools";
+import {
+  concatAudioBuffers,
+  sliceAudioBuffer,
+  timeStretchAudioBufferSegment,
+} from "../../components/studio/tools/timeStretch";
+import { encodeWavFromAudioBuffer } from "../../components/studio/tools/wav";
 
 export const dynamic = "force-dynamic";
 
@@ -304,6 +310,7 @@ export default function MixStudio() {
   const [selectedRegion, setSelectedRegion] = useState<{ trackId: string; regionId: string } | null>(
     null,
   );
+  const originalFileByTrackRef = useRef<Record<string, File>>({});
   const [hasMixed, setHasMixed] = useState(false);
   const [isMastering, setIsMastering] = useState(false);
   const [referenceProfile, setReferenceProfile] = useState<any | null>(null);
@@ -530,6 +537,15 @@ export default function MixStudio() {
                             pan: typeof r.pan === "number" ? r.pan : 0,
                             fadeInSec: typeof r.fadeInSec === "number" ? r.fadeInSec : 0,
                             fadeOutSec: typeof r.fadeOutSec === "number" ? r.fadeOutSec : 0,
+                            stretchRate:
+                              typeof r.stretchRate === "number" ? r.stretchRate : 1,
+                            automation: Array.isArray(r.automation)
+                              ? r.automation
+                                  .filter((p: any) =>
+                                    p && typeof p.t === "number" && typeof p.v === "number",
+                                  )
+                                  .map((p: any) => ({ t: p.t, v: p.v }))
+                              : [],
                           };
                         })
                         .filter((r: StudioRegion | null): r is StudioRegion => r !== null)
@@ -1574,6 +1590,8 @@ export default function MixStudio() {
           pan: typeof r.pan === "number" ? r.pan : 0,
           fadeInSec: typeof r.fadeInSec === "number" ? r.fadeInSec : 0,
           fadeOutSec: typeof r.fadeOutSec === "number" ? r.fadeOutSec : 0,
+          stretchRate: typeof (r as any).stretchRate === "number" ? (r as any).stretchRate : 1,
+          automation: Array.isArray((r as any).automation) ? (r as any).automation : [],
         })),
         plugins: (track.plugins || []).map((plugin) => ({
           id: plugin.id,
@@ -1684,11 +1702,20 @@ export default function MixStudio() {
       pan: typeof r.pan === "number" ? r.pan : 0,
       fadeInSec: typeof r.fadeInSec === "number" ? r.fadeInSec : 0,
       fadeOutSec: typeof r.fadeOutSec === "number" ? r.fadeOutSec : 0,
+      stretchRate: typeof (r as any).stretchRate === "number" ? (r as any).stretchRate : 1,
+      automationPoints: Array.isArray((r as any).automation) ? (r as any).automation.length : 0,
     };
   }, [selectedRegion, tracks]);
 
   const patchSelectedRegion = useCallback(
-    (patch: { gainDb?: number; pan?: number; fadeInSec?: number; fadeOutSec?: number }) => {
+    (patch: {
+      gainDb?: number;
+      pan?: number;
+      fadeInSec?: number;
+      fadeOutSec?: number;
+      stretchRate?: number;
+      automation?: { t: number; v: number }[];
+    }) => {
       if (!selectedRegion) return;
       setTracks((prev) =>
         prev.map((t) => {
@@ -1706,6 +1733,116 @@ export default function MixStudio() {
       );
     },
     [selectedRegion],
+  );
+
+  const applyTimeStretchToTrack = useCallback(
+    async (trackId: string, regionId: string, stretchRate: number) => {
+      const t = tracks.find((x) => x.id === trackId);
+      if (!t?.file) return;
+      const regions = t.regions || [];
+      const region = regions.find((r) => r.id === regionId);
+      if (!region) return;
+      if (!Number.isFinite(stretchRate) || stretchRate <= 0) return;
+      if (Math.abs(stretchRate - 1) < 0.01) return;
+
+      if (!originalFileByTrackRef.current[trackId]) {
+        originalFileByTrackRef.current[trackId] = t.file;
+      }
+
+      // Decode current file
+      const ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+      try {
+        const arrayBuffer = await t.file.arrayBuffer();
+        const audioBuffer = await ac.decodeAudioData(arrayBuffer.slice(0));
+
+        const start = Math.max(0, region.start);
+        const end = Math.max(start, region.end);
+        const oldDur = end - start;
+        if (oldDur <= 0) return;
+
+        const prefix = sliceAudioBuffer(ac, audioBuffer, 0, start);
+        const stretched = await timeStretchAudioBufferSegment(
+          ac,
+          audioBuffer,
+          start,
+          end,
+          stretchRate,
+        );
+        const suffix = sliceAudioBuffer(ac, audioBuffer, end, audioBuffer.duration);
+
+        const combined = concatAudioBuffers(ac, [prefix, stretched, suffix]);
+        const blob = encodeWavFromAudioBuffer(combined);
+        const nextFile = new File([blob], `${t.name}-stretched.wav`, {
+          type: "audio/wav",
+        });
+
+        const delta = stretched.duration - oldDur;
+        const oldEnd = end;
+        const newEnd = start + stretched.duration;
+
+        setTracks((prev) =>
+          prev.map((trk) => {
+            if (trk.id !== trackId) return trk;
+            const nextRegions: StudioRegion[] = (trk.regions || []).map((r) => {
+              const automation = Array.isArray((r as any).automation)
+                ? ((r as any).automation as any)
+                : [];
+
+              if (r.id === regionId) {
+                const nextAutomation = automation
+                  .filter((p: any) => p && typeof p.t === "number" && typeof p.v === "number")
+                  .map((p: any) => {
+                    const tt = p.t;
+                    if (tt < start) return p;
+                    if (tt > oldEnd) return { ...p, t: tt + delta };
+                    return { ...p, t: start + (tt - start) * stretchRate };
+                  })
+                  .sort((a: any, b: any) => a.t - b.t);
+
+                return {
+                  ...r,
+                  end: newEnd,
+                  stretchRate: 1,
+                  automation: nextAutomation,
+                } as any;
+              }
+
+              if (r.start >= oldEnd) {
+                const shiftedAutomation = automation
+                  .filter((p: any) => p && typeof p.t === "number" && typeof p.v === "number")
+                  .map((p: any) => ({ ...p, t: p.t + delta }))
+                  .sort((a: any, b: any) => a.t - b.t);
+                return {
+                  ...r,
+                  start: r.start + delta,
+                  end: r.end + delta,
+                  automation: shiftedAutomation,
+                } as any;
+              }
+
+              return r;
+            });
+
+            return {
+              ...trk,
+              file: nextFile,
+              processed: false,
+              regions: nextRegions,
+            };
+          }),
+        );
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Time-stretch failed", error);
+      } finally {
+        try {
+          await ac.close();
+        } catch {
+          // ignore
+        }
+      }
+    },
+    [tracks],
   );
 
   useEffect(() => {
@@ -1900,6 +2037,9 @@ export default function MixStudio() {
                         t.id === trackId ? { ...t, regions: nextRegions } : t,
                       ),
                     );
+                  }}
+                  onCommitStretch={(trackId, regionId, stretchRate) => {
+                    void applyTimeStretchToTrack(trackId, regionId, stretchRate);
                   }}
                   onFileSelected={handleFileSelected}
                   onVolumeChange={handleVolumeChange}
