@@ -630,13 +630,19 @@ export default function MixStudio() {
 
         const previous = lastPresetByModeRef.current[studioMode];
         let nextId: string | null = null;
+
         if (previous && data.some((p) => p.id === previous)) {
           nextId = previous;
         } else if (data.length) {
-          // For beats, prefer Minimal Beat Processing by default when present
-          const minimalBeat = data.find((p) => p.id === "minimal_beat_processing");
-          nextId = minimalBeat?.id ?? data[0].id;
+          // For full-mix studio flows, prefer presets that target the full mix
+          const fullMixPresets = data.filter((p) => p.target === "full_mix");
+          if (fullMixPresets.length) {
+            nextId = fullMixPresets[0].id;
+          } else {
+            nextId = data[0].id;
+          }
         }
+
         setSelectedPresetId(nextId);
       })
       .catch((error) => {
