@@ -30,6 +30,8 @@ import {
 } from "../../components/studio/pluginTypes";
 import type { PluginWindowPosition } from "../../components/studio/PluginWindow";
 import PluginWindow from "../../components/studio/PluginWindow";
+import StudioToolsPanel from "../../components/studio/StudioToolsPanel";
+import type { StudioRegion, StudioTool } from "../../components/studio/tools/studioTools";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,7 @@ export type TrackType = {
   // Visually indicate that this track's audio has been processed/mastered.
   processed?: boolean;
   plugins?: TrackPlugin[];
+  regions?: StudioRegion[];
 };
 
 type StudioMode =
@@ -296,6 +299,11 @@ export default function MixStudio() {
   const [sessionScale, setSessionScale] = useState<"Major" | "Minor">("Major");
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [selectedClipTrackId, setSelectedClipTrackId] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<StudioTool>("select");
+  const [toolsCollapsed, setToolsCollapsed] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<{ trackId: string; regionId: string } | null>(
+    null,
+  );
   const [hasMixed, setHasMixed] = useState(false);
   const [isMastering, setIsMastering] = useState(false);
   const [referenceProfile, setReferenceProfile] = useState<any | null>(null);
@@ -505,6 +513,28 @@ export default function MixStudio() {
                 return {
                   ...base,
                   plugins,
+                  regions: Array.isArray(t.regions)
+                    ? (t.regions
+                        .filter((r: any) => r && typeof r === "object")
+                        .map((r: any): StudioRegion | null => {
+                          const start = typeof r.start === "number" ? r.start : null;
+                          const end = typeof r.end === "number" ? r.end : null;
+                          if (start == null || end == null) return null;
+                          if (!(end > start)) return null;
+                          return {
+                            id: typeof r.id === "string" ? r.id : crypto.randomUUID(),
+                            start: Math.max(0, start),
+                            end: Math.max(0, end),
+                            name: typeof r.name === "string" ? r.name : undefined,
+                            gainDb: typeof r.gainDb === "number" ? r.gainDb : 0,
+                            pan: typeof r.pan === "number" ? r.pan : 0,
+                            fadeInSec: typeof r.fadeInSec === "number" ? r.fadeInSec : 0,
+                            fadeOutSec: typeof r.fadeOutSec === "number" ? r.fadeOutSec : 0,
+                          };
+                        })
+                        .filter((r: StudioRegion | null): r is StudioRegion => r !== null)
+                        .sort((a: StudioRegion, b: StudioRegion) => a.start - b.start))
+                    : [],
                 };
               });
 
@@ -1535,6 +1565,16 @@ export default function MixStudio() {
         muted: Boolean(track.muted),
         solo: Boolean(track.solo),
         processed: Boolean(track.processed),
+        regions: (track.regions || []).map((r) => ({
+          id: r.id,
+          start: r.start,
+          end: r.end,
+          name: r.name,
+          gainDb: typeof r.gainDb === "number" ? r.gainDb : 0,
+          pan: typeof r.pan === "number" ? r.pan : 0,
+          fadeInSec: typeof r.fadeInSec === "number" ? r.fadeInSec : 0,
+          fadeOutSec: typeof r.fadeOutSec === "number" ? r.fadeOutSec : 0,
+        })),
         plugins: (track.plugins || []).map((plugin) => ({
           id: plugin.id,
           pluginId: plugin.pluginId,
@@ -1608,6 +1648,65 @@ export default function MixStudio() {
     throwFxMode,
     selectedPresetId,
   ]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
+      const isTyping =
+        tag === "input" || tag === "textarea" || (e.target as HTMLElement | null)?.isContentEditable;
+      if (isTyping) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "v") setActiveTool("select");
+      if (key === "s") setActiveTool("slice");
+      if (key === "t") setActiveTool("trim");
+      if (key === "f") setActiveTool("fade");
+      if (key === "g") setActiveTool("gain");
+      if (key === "p") setActiveTool("pan");
+      if (key === "a") setActiveTool("automation");
+      if (key === "r") setActiveTool("stretch");
+      if (key === "escape") setSelectedRegion(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const selectedRegionSummary = useMemo(() => {
+    if (!selectedRegion) return null;
+    const t = tracks.find((x) => x.id === selectedRegion.trackId);
+    if (!t) return null;
+    const r = (t.regions || []).find((x) => x.id === selectedRegion.regionId);
+    if (!r) return null;
+    return {
+      trackName: t.name,
+      regionLabel: r.name || "Clip",
+      gainDb: typeof r.gainDb === "number" ? r.gainDb : 0,
+      pan: typeof r.pan === "number" ? r.pan : 0,
+      fadeInSec: typeof r.fadeInSec === "number" ? r.fadeInSec : 0,
+      fadeOutSec: typeof r.fadeOutSec === "number" ? r.fadeOutSec : 0,
+    };
+  }, [selectedRegion, tracks]);
+
+  const patchSelectedRegion = useCallback(
+    (patch: { gainDb?: number; pan?: number; fadeInSec?: number; fadeOutSec?: number }) => {
+      if (!selectedRegion) return;
+      setTracks((prev) =>
+        prev.map((t) => {
+          if (t.id !== selectedRegion.trackId) return t;
+          const nextRegions = (t.regions || []).map((r) =>
+            r.id === selectedRegion.regionId
+              ? {
+                  ...r,
+                  ...patch,
+                }
+              : r,
+          );
+          return { ...t, regions: nextRegions };
+        }),
+      );
+    },
+    [selectedRegion],
+  );
 
   useEffect(() => {
     if (!projectId) return;
@@ -1747,77 +1846,111 @@ export default function MixStudio() {
         onSessionScaleChange={setSessionScale}
       />
 
-      <div className="flex-1 overflow-y-auto overflow-x-auto bg-black pb-28 sm:pb-0">
-        <div className="min-w-[900px]">
-          <Timeline
-            zoom={zoom}
-            gridResolution={gridResolution}
-            bpm={bpm}
-            onZoomChange={(value) =>
-              setZoom((prev) => {
-                const clamped = Math.min(6, Math.max(0.5, value));
-                return Number.isFinite(clamped) ? clamped : prev;
-              })
-            }
+      <div className="flex-1 bg-black pb-28 sm:pb-0 flex">
+        <div className="hidden sm:block">
+          <StudioToolsPanel
+            collapsed={toolsCollapsed}
+            onToggleCollapsed={() => setToolsCollapsed((p) => !p)}
+            activeTool={activeTool}
+            onChangeTool={setActiveTool}
+            selectedRegionSummary={selectedRegionSummary}
+            onChangeSelectedRegion={patchSelectedRegion}
           />
+        </div>
 
-          <div>
-            {tracks.map((track) => (
-              <TrackLane
-                key={track.id}
-                track={track}
-                zoom={zoom}
-                isPlaying={isPlaying}
-                masterVolume={masterVolume}
-                onFileSelected={handleFileSelected}
-                onVolumeChange={handleVolumeChange}
-                onPanChange={handlePanChange}
-                onLevelChange={handleTrackLevelChange}
-                onGenderChange={handleTrackGenderChange}
-                onToggleMute={handleToggleMute}
-                onToggleSolo={handleToggleSolo}
-                isAnySoloActive={isAnySoloActive}
-                isSelected={selectedTrackId === track.id}
-                onSelect={handleSelectTrack}
-                plugins={track.plugins}
-                onPluginsChange={handleTrackPluginsChange}
-                onOpenPlugin={(trackId, plugin) => {
-                  openPluginWindow(trackId, plugin.id);
-                }}
-                isAudioSelected={selectedClipTrackId === track.id}
-                onSelectAudio={(trackId) => setSelectedClipTrackId(trackId)}
-                onClearAudio={handleClearTrackAudio}
-                onDelete={handleDeleteTrack}
-                onDuplicate={handleDuplicateTrack}
-                onProcess={async (trackId) => {
-                  const current = tracks.find((t) => t.id === trackId);
-                  if (!current || !current.file || isProcessing) return;
-                  setSelectedTrackId(trackId);
-                  setIsProcessing(true);
-                  try {
-                    const processed = await processTrackWithAI(current);
-                    if (processed) {
-                      setTracks((prev) =>
-                        prev.map((t) =>
-                          t.id === trackId
-                            ? {
-                                ...t,
-                                file: processed,
-                                processed: true,
-                              }
-                            : t,
-                        ),
-                      );
-                    }
-                  } catch (error) {
-                    // eslint-disable-next-line no-console
-                    console.error("Error processing track from context menu", error);
-                  } finally {
-                    setIsProcessing(false);
+        <div className="flex-1 overflow-y-auto overflow-x-auto">
+          <div className="min-w-[900px]">
+            <Timeline
+              zoom={zoom}
+              gridResolution={gridResolution}
+              bpm={bpm}
+              onZoomChange={(value) =>
+                setZoom((prev) => {
+                  const clamped = Math.min(6, Math.max(0.5, value));
+                  return Number.isFinite(clamped) ? clamped : prev;
+                })
+              }
+            />
+
+            <div>
+              {tracks.map((track) => (
+                <TrackLane
+                  key={track.id}
+                  track={track}
+                  zoom={zoom}
+                  isPlaying={isPlaying}
+                  masterVolume={masterVolume}
+                  activeTool={activeTool}
+                  gridResolution={gridResolution}
+                  bpm={bpm}
+                  regions={track.regions || []}
+                  selectedRegionId={
+                    selectedRegion?.trackId === track.id ? selectedRegion.regionId : null
                   }
-                }}
-              />
-            ))}
+                  onSelectRegion={(trackId, regionId) => {
+                    if (!regionId) {
+                      setSelectedRegion(null);
+                      return;
+                    }
+                    setSelectedRegion({ trackId, regionId });
+                  }}
+                  onRegionsChange={(trackId, nextRegions) => {
+                    setTracks((prev) =>
+                      prev.map((t) =>
+                        t.id === trackId ? { ...t, regions: nextRegions } : t,
+                      ),
+                    );
+                  }}
+                  onFileSelected={handleFileSelected}
+                  onVolumeChange={handleVolumeChange}
+                  onPanChange={handlePanChange}
+                  onLevelChange={handleTrackLevelChange}
+                  onGenderChange={handleTrackGenderChange}
+                  onToggleMute={handleToggleMute}
+                  onToggleSolo={handleToggleSolo}
+                  isAnySoloActive={isAnySoloActive}
+                  isSelected={selectedTrackId === track.id}
+                  onSelect={handleSelectTrack}
+                  plugins={track.plugins}
+                  onPluginsChange={handleTrackPluginsChange}
+                  onOpenPlugin={(trackId, plugin) => {
+                    openPluginWindow(trackId, plugin.id);
+                  }}
+                  isAudioSelected={selectedClipTrackId === track.id}
+                  onSelectAudio={(trackId) => setSelectedClipTrackId(trackId)}
+                  onClearAudio={handleClearTrackAudio}
+                  onDelete={handleDeleteTrack}
+                  onDuplicate={handleDuplicateTrack}
+                  onProcess={async (trackId) => {
+                    const current = tracks.find((t) => t.id === trackId);
+                    if (!current || !current.file || isProcessing) return;
+                    setSelectedTrackId(trackId);
+                    setIsProcessing(true);
+                    try {
+                      const processed = await processTrackWithAI(current);
+                      if (processed) {
+                        setTracks((prev) =>
+                          prev.map((t) =>
+                            t.id === trackId
+                              ? {
+                                  ...t,
+                                  file: processed,
+                                  processed: true,
+                                }
+                              : t,
+                          ),
+                        );
+                      }
+                    } catch (error) {
+                      // eslint-disable-next-line no-console
+                      console.error("Error processing track from context menu", error);
+                    } finally {
+                      setIsProcessing(false);
+                    }
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
