@@ -30,28 +30,30 @@ const formatUnit = (unit: string) => {
   return trimmed;
 };
 
-const starterOptions: PayAsYouGoOption[] = [
-  paygAudioCleanup && {
-    id: paygAudioCleanup.id,
-    label: `${paygAudioCleanup.name} · ${paygAudioCleanup.price} ${formatUnit(paygAudioCleanup.unit)}`,
-    amountLabel: paygAudioCleanup.price,
-  },
-  paygMixOnly && {
-    id: paygMixOnly.id,
-    label: `${paygMixOnly.name} · ${paygMixOnly.price} ${formatUnit(paygMixOnly.unit)}`,
-    amountLabel: paygMixOnly.price,
-  },
-  paygMixMaster && {
-    id: paygMixMaster.id,
-    label: `${paygMixMaster.name} · ${paygMixMaster.price} ${formatUnit(paygMixMaster.unit)}`,
-    amountLabel: paygMixMaster.price,
-  },
-  paygMasterOnly && {
-    id: paygMasterOnly.id,
-    label: `${paygMasterOnly.name} · ${paygMasterOnly.price} ${formatUnit(paygMasterOnly.unit)}`,
-    amountLabel: paygMasterOnly.price,
-  },
-].filter((option): option is PayAsYouGoOption => Boolean(option));
+const starterOptions: PayAsYouGoOption[] = (
+  [
+    paygAudioCleanup && {
+      id: paygAudioCleanup.id,
+      label: `${paygAudioCleanup.name} · ${paygAudioCleanup.price} ${formatUnit(paygAudioCleanup.unit)}`,
+      amountLabel: paygAudioCleanup.price,
+    },
+    paygMixOnly && {
+      id: paygMixOnly.id,
+      label: `${paygMixOnly.name} · ${paygMixOnly.price} ${formatUnit(paygMixOnly.unit)}`,
+      amountLabel: paygMixOnly.price,
+    },
+    paygMixMaster && {
+      id: paygMixMaster.id,
+      label: `${paygMixMaster.name} · ${paygMixMaster.price} ${formatUnit(paygMixMaster.unit)}`,
+      amountLabel: paygMixMaster.price,
+    },
+    paygMasterOnly && {
+      id: paygMasterOnly.id,
+      label: `${paygMasterOnly.name} · ${paygMasterOnly.price} ${formatUnit(paygMasterOnly.unit)}`,
+      amountLabel: paygMasterOnly.price,
+    },
+  ].filter(Boolean) as PayAsYouGoOption[]
+);
 
 const PLANS: Record<PlanKey, {
   name: string;
