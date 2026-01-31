@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 import PricingCard from "../components/pricing/PricingCard";
 
@@ -216,6 +216,7 @@ function TestimonialCard({ quote, name, role }: Testimonial) {
 // Public landing page root
 export default function Landing() {
   const router = useRouter();
+  const [billingPrices, setBillingPrices] = useState<Record<string, number>>({});
 
   // If a user is already logged in, send them to their home dashboard
   // instead of keeping them on the public landing page.
@@ -240,6 +241,33 @@ export default function Landing() {
       isMounted = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    let isMounted = true;
+
+    supabase
+      .from("billing_plans")
+      .select("key, price_month")
+      .then(({ data, error }) => {
+        if (!isMounted || error || !data) return;
+        const map: Record<string, number> = {};
+        for (const row of data as { key: string; price_month: number | null }[]) {
+          if (row.key && typeof row.price_month === "number") {
+            map[row.key] = row.price_month;
+          }
+        }
+        setBillingPrices(map);
+      })
+      .catch(() => {
+        // ignore – fall back to static labels
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const features: Feature[] = [
     {
@@ -314,6 +342,13 @@ export default function Landing() {
       role: "Producer · Atlanta, USA 🇺🇸",
     },
   ];
+
+  const creatorPriceLabel =
+    typeof billingPrices.creator === "number"
+      ? `$${billingPrices.creator.toFixed(2)}`
+      : "$19.99";
+  const proPriceLabel =
+    typeof billingPrices.pro === "number" ? `$${billingPrices.pro.toFixed(2)}` : "$39.99";
 
   return (
     <main className="min-h-screen bg-brand-bg text-brand-text">
@@ -446,11 +481,11 @@ export default function Landing() {
                     // Defer to the global StudioFlow modal; Navbar
                     // and other shells host it so this link simply
                     // relies on the user opening Studio from the
-                    // main navigation.
-                    const ev = new CustomEvent("open-studio-flow", { bubbles: true });
-                    event.currentTarget.dispatchEvent(ev);
-                  }}
-                  className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-1.5 text-[11px] font-medium text-white transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#ff291e]"
+                    features={[
+                      "Audio cleanup from $4.99 per track",
+                      "Mixing & mastering options per song",
+                      "No monthly commitment",
+                    ]}
                 >
                   Try your own track
                 </Link>
@@ -458,12 +493,12 @@ export default function Landing() {
             </div>
           </div>
         </div>
-      </section>
-
-      <section
-        className="border-b border-white/5 bg-brand-surface py-14 sm:py-16"
-        aria-label="Caribbean artist testimonials"
-      >
+                    features={[
+                      "6 × Audio cleanup per month",
+                      "3 × Mixing only per month",
+                      "1 × Mastering only per month",
+                      "Standard presets & queue",
+                    ]}
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -471,12 +506,12 @@ export default function Landing() {
                 Trusted by Caribbean and global creators.
               </h2>
               <p className="mt-3 max-w-xl text-sm text-brand-muted">
-                MIXSMVRT keeps the flavour of your riddim while tightening the mix.
-                Fast enough for last‑minute uploads, precise enough for official releases.
-              </p>
-            </div>
-          </div>
-          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                    features={[
+                      "10 × Audio cleanup per month",
+                      "6 × Mixing only per month",
+                      "3 × Mix + master per month",
+                      "All premium presets & priority queue",
+                    ]}
             {testimonials.map((item) => (
               <TestimonialCard key={item.quote} {...item} />
             ))}
@@ -583,7 +618,7 @@ export default function Landing() {
             <PricingCard
               kind="subscription"
               name="Creator Plan"
-              price="$19.99"
+              price={creatorPriceLabel}
               description="For active artists and producers dropping regularly."
               features={[
                 "6 × Audio cleanup per month",
@@ -596,7 +631,7 @@ export default function Landing() {
             <PricingCard
               kind="subscription"
               name="Pro Artist Plan"
-              price="$39.99"
+              price={proPriceLabel}
               description="For serious artists and small studios."
               features={[
                 "10 × Audio cleanup per month",
