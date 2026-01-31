@@ -30,6 +30,29 @@ const formatUnit = (unit: string) => {
   return trimmed;
 };
 
+const starterOptions: PayAsYouGoOption[] = [
+  paygAudioCleanup && {
+    id: paygAudioCleanup.id,
+    label: `${paygAudioCleanup.name} · ${paygAudioCleanup.price} ${formatUnit(paygAudioCleanup.unit)}`,
+    amountLabel: paygAudioCleanup.price,
+  },
+  paygMixOnly && {
+    id: paygMixOnly.id,
+    label: `${paygMixOnly.name} · ${paygMixOnly.price} ${formatUnit(paygMixOnly.unit)}`,
+    amountLabel: paygMixOnly.price,
+  },
+  paygMixMaster && {
+    id: paygMixMaster.id,
+    label: `${paygMixMaster.name} · ${paygMixMaster.price} ${formatUnit(paygMixMaster.unit)}`,
+    amountLabel: paygMixMaster.price,
+  },
+  paygMasterOnly && {
+    id: paygMasterOnly.id,
+    label: `${paygMasterOnly.name} · ${paygMasterOnly.price} ${formatUnit(paygMasterOnly.unit)}`,
+    amountLabel: paygMasterOnly.price,
+  },
+].filter((option): option is PayAsYouGoOption => Boolean(option));
+
 const PLANS: Record<PlanKey, {
   name: string;
   price: string;
@@ -52,28 +75,7 @@ const PLANS: Record<PlanKey, {
       paygMixMaster && `${paygMixMaster.name} – ${paygMixMaster.price} ${paygMixMaster.unit}`,
       paygMasterOnly && `${paygMasterOnly.name} – ${paygMasterOnly.price} ${paygMasterOnly.unit}`,
     ].filter((feature): feature is string => Boolean(feature)),
-    options: [
-      paygAudioCleanup && {
-        id: paygAudioCleanup.id,
-        label: `${paygAudioCleanup.name} · ${paygAudioCleanup.price} ${formatUnit(paygAudioCleanup.unit)}`,
-        amountLabel: paygAudioCleanup.price,
-      },
-      paygMixOnly && {
-        id: paygMixOnly.id,
-        label: `${paygMixOnly.name} · ${paygMixOnly.price} ${formatUnit(paygMixOnly.unit)}`,
-        amountLabel: paygMixOnly.price,
-      },
-      paygMixMaster && {
-        id: paygMixMaster.id,
-        label: `${paygMixMaster.name} · ${paygMixMaster.price} ${formatUnit(paygMixMaster.unit)}`,
-        amountLabel: paygMixMaster.price,
-      },
-      paygMasterOnly && {
-        id: paygMasterOnly.id,
-        label: `${paygMasterOnly.name} · ${paygMasterOnly.price} ${formatUnit(paygMasterOnly.unit)}`,
-        amountLabel: paygMasterOnly.price,
-      },
-    ].filter((option): option is PayAsYouGoOption => Boolean(option)),
+    options: starterOptions,
   },
   creator: {
     name: creatorSubscription?.name ?? "Creator Plan",
