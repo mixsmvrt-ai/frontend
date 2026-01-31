@@ -14,6 +14,7 @@ const navItems = [
   { href: "/admin/dsp-presets", label: "DSP Presets", icon: "🎛" },
   { href: "/admin/pricing", label: "Pricing & Plans", icon: "💳" },
   { href: "/admin/payments", label: "Payments", icon: "💰" },
+  { href: "/admin/tickets", label: "Tickets", icon: "🎟" },
   { href: "/admin/storage", label: "Storage", icon: "💾" },
   { href: "/admin/logs", label: "Logs", icon: "📜" },
   { href: "/admin/content", label: "Content", icon: "📺" },
