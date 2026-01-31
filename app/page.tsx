@@ -144,54 +144,50 @@ function WaveformHero() {
               );
             })}
           </div>
-          <div className="mt-2 flex items-center justify-between text-[10px] text-brand-muted">
-            <span>-20 LUFS</span>
-            <span>-12</span>
-            <span>-6</span>
-            <span className="text-brand-accent">-9 dBFS</span>
+              <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-brand-muted">
+                <span>
+                  Example preset: <span className="text-brand-accent">Streaming Ready · Dancehall</span>
+                </span>
+                <Link
+                  href="/studio"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    const ev = new CustomEvent("open-studio-flow", { bubbles: true });
+                    event.currentTarget.dispatchEvent(ev);
+                  }}
+                  className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-1.5 text-[11px] font-medium text-white transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#ff291e]"
+                >
+                  Try your own track
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex-1 rounded-2xl bg-black/50 p-3">
-          <div className="mb-2 flex items-center justify-between text-[10px] font-medium text-brand-muted">
-            <span>Signal Chain</span>
-            <span className="rounded-full bg-brand-primary/15 px-2 py-0.5 text-[9px] text-brand-primary">
-              Vocal · Beat · Master
-            </span>
+      </section>
+
+      <section
+        className="border-b border-white/5 bg-brand-surface py-14 sm:py-16"
+        aria-label="Caribbean artist testimonials"
+      >
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-brand-text sm:text-xl">
+                Trusted by Caribbean and global creators.
+              </h2>
+              <p className="mt-3 max-w-xl text-sm text-brand-muted">
+                MIXSMVRT keeps the flavour of your riddim while tightening the mix.
+                Fast enough for last‑minute uploads, precise enough for official releases.
+              </p>
+            </div>
           </div>
-          <div className="mb-3 flex flex-wrap items-center gap-1 text-[10px] text-brand-text/80">
-            <span className="rounded-full bg-brand-surfaceMuted px-2 py-1">EQ</span>
-            <span className="rounded-full bg-brand-surfaceMuted px-2 py-1">De-esser</span>
-            <span className="rounded-full bg-brand-surfaceMuted px-2 py-1">Bus Comp</span>
-            <span className="rounded-full bg-brand-surfaceMuted px-2 py-1">Saturation</span>
-            <span className="rounded-full bg-brand-surfaceMuted px-2 py-1">Limiter</span>
-          </div>
-          <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-brand-surfaceMuted">
-            <div className="h-full w-2/3 animate-[pulse_2.4s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-brand-primary via-brand-accent to-white" />
-          </div>
-          <div className="flex items-center justify-between text-[10px] text-brand-muted">
-            <span>01:12 / 03:45</span>
-            <span>Preset · Streaming Ready</span>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {testimonials.map((item) => (
+              <TestimonialCard key={item.quote} {...item} />
+            ))}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function FeatureCard({ title, description }: Feature) {
-  return (
-    <div className="group flex flex-col gap-2 rounded-2xl border border-white/5 bg-brand-surfaceMuted/80 p-5 shadow-panel transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-primary/70 hover:shadow-[0_0_40px_rgba(225,6,0,0.45)]">
-      <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand-primary/15 text-brand-primary">
-        ●
-      </div>
-      <h3 className="text-sm font-semibold text-brand-text">{title}</h3>
-      <p className="text-xs text-brand-muted">{description}</p>
-    </div>
-  );
-}
-
-function StepCard({ title, description }: Step) {
-  return (
+      </section>
     <div className="relative flex flex-col gap-2 rounded-2xl border border-white/5 bg-brand-surface/80 p-5">
       <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-brand-accent/80 to-transparent" />
       <h3 className="text-sm font-semibold text-brand-text">{title}</h3>
