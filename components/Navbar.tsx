@@ -22,6 +22,7 @@ export function Navbar() {
   const pathname = usePathname() ?? "/";
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { open: openStudioModal } = useStudioFlowModal();
 
   // Listen for a bubbling custom event from other Studio links
@@ -43,18 +44,45 @@ export function Navbar() {
       .getSession()
       .then(({ data }) => {
         if (!isMounted) return;
-        setCurrentUser(data.session?.user ?? null);
+        const user = data.session?.user ?? null;
+        setCurrentUser(user);
+
+        if (user) {
+          const role = (user.user_metadata as any)?.role ?? (user.app_metadata as any)?.role;
+          const adminEmailRaw = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "mixsmvrt@gmail.com";
+          const adminEmail = adminEmailRaw.trim().toLowerCase();
+          const userEmail = (user.email ?? "").trim().toLowerCase();
+          const isAdminByEmail = Boolean(userEmail && userEmail === adminEmail);
+          const isAdminByRole = Boolean(role === "admin");
+          setIsAdmin(isAdminByEmail || isAdminByRole);
+        } else {
+          setIsAdmin(false);
+        }
       })
       .catch(() => {
         if (!isMounted) return;
         setCurrentUser(null);
+        setIsAdmin(false);
       });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
-      setCurrentUser(session?.user ?? null);
+      const user = session?.user ?? null;
+      setCurrentUser(user);
+
+      if (user) {
+        const role = (user.user_metadata as any)?.role ?? (user.app_metadata as any)?.role;
+        const adminEmailRaw = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "mixsmvrt@gmail.com";
+        const adminEmail = adminEmailRaw.trim().toLowerCase();
+        const userEmail = (user.email ?? "").trim().toLowerCase();
+        const isAdminByEmail = Boolean(userEmail && userEmail === adminEmail);
+        const isAdminByRole = Boolean(role === "admin");
+        setIsAdmin(isAdminByEmail || isAdminByRole);
+      } else {
+        setIsAdmin(false);
+      }
     });
 
     return () => {
@@ -124,6 +152,18 @@ export function Navbar() {
                 <span>{item.label}</span>
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={`relative inline-flex items-center gap-1 rounded-full border border-red-500/40 px-3 py-1 text-[12px] font-medium transition-colors hover:border-red-400 hover:text-red-200 ${
+                  pathname.startsWith("/admin")
+                    ? "text-red-200 shadow-[0_0_14px_rgba(248,113,113,0.75)]"
+                    : "text-red-300/80"
+                }`}
+              >
+                <span>Control room</span>
+              </Link>
+            )}
           </nav>
         </div>
 
@@ -177,6 +217,7 @@ export function Navbar() {
         pathname={pathname}
         onLogout={handleLogout}
         onOpenStudioModal={openStudioModal}
+        isAdmin={isAdmin}
       />
     </header>
   );
