@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ProtectedPage } from "../../../components/ProtectedPage";
 import { PlanPayPalButtons } from "../../../components/PlanPayPalButtons";
+import { PAYG_SERVICES, SUBSCRIPTION_PLANS } from "../../../lib/pricing";
 
 type PlanKey = "starter" | "creator" | "pro";
 
@@ -11,6 +12,22 @@ type PayAsYouGoOption = {
   id: string;
   label: string;
   amountLabel: string; // e.g. "$59" so we can parse the numeric amount
+};
+
+const paygAudioCleanup = PAYG_SERVICES.find((service) => service.id === "audio-cleanup");
+const paygMixOnly = PAYG_SERVICES.find((service) => service.id === "mix-only");
+const paygMixMaster = PAYG_SERVICES.find((service) => service.id === "mix-master");
+const paygMasterOnly = PAYG_SERVICES.find((service) => service.id === "master-only");
+
+const creatorSubscription = SUBSCRIPTION_PLANS.find((plan) => plan.id === "creator");
+const proArtistSubscription = SUBSCRIPTION_PLANS.find((plan) => plan.id === "pro-artist");
+
+const formatUnit = (unit: string) => {
+  const trimmed = unit.trim();
+  if (trimmed.startsWith("/")) {
+    return `per ${trimmed.slice(1).trim()}`;
+  }
+  return trimmed;
 };
 
 const PLANS: Record<PlanKey, {
@@ -30,60 +47,73 @@ const PLANS: Record<PlanKey, {
     description:
       "Perfect if you only need MIXSMVRT for the occasional single, demo, or riddim clean-up.",
     features: [
-      "Audio cleanup – $10 per track",
-      "Mixing only – $29 per song",
-      "Mixing & mastering – $59 per song",
-      "Mastering only – $25 per song",
-    ],
+      paygAudioCleanup && `${paygAudioCleanup.name} – ${paygAudioCleanup.price} ${paygAudioCleanup.unit}`,
+      paygMixOnly && `${paygMixOnly.name} – ${paygMixOnly.price} ${paygMixOnly.unit}`,
+      paygMixMaster && `${paygMixMaster.name} – ${paygMixMaster.price} ${paygMixMaster.unit}`,
+      paygMasterOnly && `${paygMasterOnly.name} – ${paygMasterOnly.price} ${paygMasterOnly.unit}`,
+    ].filter((feature): feature is string => Boolean(feature)),
     options: [
-      {
-        id: "cleanup",
-        label: "Audio cleanup  $10 per track",
-        amountLabel: "$10",
+      paygAudioCleanup && {
+        id: paygAudioCleanup.id,
+        label: `${paygAudioCleanup.name} · ${paygAudioCleanup.price} ${formatUnit(paygAudioCleanup.unit)}`,
+        amountLabel: paygAudioCleanup.price,
       },
-      {
-        id: "mix",
-        label: "Mixing only  $29 per song",
-        amountLabel: "$29",
+      paygMixOnly && {
+        id: paygMixOnly.id,
+        label: `${paygMixOnly.name} · ${paygMixOnly.price} ${formatUnit(paygMixOnly.unit)}`,
+        amountLabel: paygMixOnly.price,
       },
-      {
-        id: "mix-master",
-        label: "Mixing & mastering  $59 per song",
-        amountLabel: "$59",
+      paygMixMaster && {
+        id: paygMixMaster.id,
+        label: `${paygMixMaster.name} · ${paygMixMaster.price} ${formatUnit(paygMixMaster.unit)}`,
+        amountLabel: paygMixMaster.price,
       },
-      {
-        id: "master",
-        label: "Mastering only  $25 per song",
-        amountLabel: "$25",
+      paygMasterOnly && {
+        id: paygMasterOnly.id,
+        label: `${paygMasterOnly.name} · ${paygMasterOnly.price} ${formatUnit(paygMasterOnly.unit)}`,
+        amountLabel: paygMasterOnly.price,
       },
-    ],
+    ].filter((option): option is PayAsYouGoOption => Boolean(option)),
   },
   creator: {
-    name: "Creator",
-    price: "$24",
-    billingPeriod: "Per month",
-    headline: "For active artists & producers.",
+    name: creatorSubscription?.name ?? "Creator Plan",
+    price: creatorSubscription?.price ?? "$19.99",
+    billingPeriod: creatorSubscription
+      ? `${creatorSubscription.billingPeriod.charAt(0).toUpperCase()}${creatorSubscription.billingPeriod.slice(1)}`
+      : "Per month",
+    headline:
+      creatorSubscription?.tagline ?? "For active artists & producers dropping regularly.",
     description:
-      "Release consistently, collaborate often, and keep your mixes and masters sounding the same across projects.",
-    features: [
-      "Up to 40 masters per month",
-      "Full stem mixing support",
-      "Preset chains + A/B comparison",
-      "Priority support",
+      creatorSubscription?.description ??
+      "Release regularly and keep mixes and masters consistent across songs without booking extra studio time.",
+    features: creatorSubscription?.includes ?? [
+      "6 Audio Cleanups",
+      "3 Mixing Only",
+      "1 Mastering Only",
+      "Standard presets",
+      "Standard processing queue",
     ],
   },
   pro: {
-    name: "Pro",
-    price: "$59",
-    billingPeriod: "Per month",
-    headline: "For studios & power users.",
+    name: proArtistSubscription?.name ?? "Pro Artist Plan",
+    price: proArtistSubscription?.price ?? "$39.99",
+    billingPeriod: proArtistSubscription
+      ? `${proArtistSubscription.billingPeriod.charAt(0).toUpperCase()}${proArtistSubscription.billingPeriod.slice(1)}`
+      : "Per month",
+    headline:
+      proArtistSubscription?.tagline ?? "For serious artists, small studios & power users.",
     description:
-      "Ideal for small studios, producers with multiple artists, and content teams handling lots of drops.",
-    features: [
-      "Unlimited masters (fair use)",
-      "Team accounts (coming soon)",
-      "Custom sound profiles",
-      "Early access to new AI chains",
+      proArtistSubscription?.description ??
+      "Ideal for small studios, producers with multiple artists, and content teams handling many drops per month.",
+    features: proArtistSubscription?.includes ?? [
+      "10 Audio Cleanups",
+      "6 Mixing Only",
+      "3 Mixing + Mastering",
+      "Unlimited Mastering Only",
+      "All premium presets",
+      "Priority processing",
+      "A/B comparison",
+      "Advanced macro controls",
     ],
   },
 };
