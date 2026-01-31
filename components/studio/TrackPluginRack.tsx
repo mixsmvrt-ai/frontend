@@ -30,13 +30,6 @@ export default function TrackPluginRack({ plugins, onChange, onOpen, hidePlugins
   const [showPicker, setShowPicker] = useState(false);
   const sorted = [...plugins].sort((a, b) => a.order - b.order).slice(0, MAX_SLOTS);
 
-  const handleToggleBypass = (pluginId: string) => {
-    const next = sorted.map((plugin) =>
-      plugin.id === pluginId ? { ...plugin, enabled: !plugin.enabled } : plugin,
-    );
-    onChange(next);
-  };
-
   const handleRemove = (pluginId: string) => {
     const remaining = sorted.filter((plugin) => plugin.id !== pluginId);
     const reindexed = remaining.map((plugin, index) => ({ ...plugin, order: index }));
@@ -95,21 +88,6 @@ export default function TrackPluginRack({ plugins, onChange, onOpen, hidePlugins
               >
                 <span className="truncate text-[10px] font-medium">{plugin.name}</span>
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleToggleBypass(plugin.id);
-                    }}
-                    className="flex h-4 w-4 items-center justify-center rounded-full border border-white/25 bg-black/60"
-                    aria-label={plugin.enabled ? "Bypass plugin" : "Enable plugin"}
-                  >
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        plugin.enabled ? "bg-emerald-400" : "bg-white/30"
-                      }`}
-                    />
-                  </button>
                   {plugin.aiGenerated && (
                     <span
                       className="text-[9px] text-yellow-300"
