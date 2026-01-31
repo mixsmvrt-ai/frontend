@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
+import PricingCard from "../components/pricing/PricingCard";
 
 type Feature = {
   title: string;
@@ -22,14 +23,6 @@ type Testimonial = {
   quote: string;
   name: string;
   role: string;
-};
-
-type Tier = {
-  name: string;
-  price: string;
-  description: string;
-  highlight?: boolean;
-  features: string[];
 };
 
 function Hero() {
@@ -220,64 +213,6 @@ function TestimonialCard({ quote, name, role }: Testimonial) {
   );
 }
 
-function getPlanSlug(name: string) {
-  switch (name) {
-    case "Starter":
-      return "starter";
-    case "Creator":
-      return "creator";
-    case "Pro":
-      return "pro";
-    default:
-      return "starter";
-  }
-}
-
-function TierCard({ name, price, description, highlight, features }: Tier) {
-  const router = useRouter();
-
-  const handleClick = () => {
-    const slug = getPlanSlug(name);
-    router.push(`/pricing/${slug}`);
-  };
-  return (
-    <div
-      className={`flex h-full flex-col rounded-2xl border bg-brand-surface/80 p-5 text-sm transition-colors transition-transform duration-150 hover:-translate-y-0.5 ${
-        highlight
-          ? "border-brand-primary shadow-[0_0_45px_rgba(225,6,0,0.55)]"
-          : "border-white/5"
-      }`}
-    >
-      <div className="mb-4">
-        <h3 className="text-base font-semibold text-brand-text">{name}</h3>
-        <p className="mt-1 text-xs text-brand-muted">{description}</p>
-      </div>
-      <div className="mb-4 flex items-baseline gap-1">
-        <span className="text-2xl font-semibold text-brand-text">{price}</span>
-        <span className="text-xs text-brand-muted">/ month</span>
-      </div>
-      <ul className="mb-4 space-y-1 text-xs text-brand-muted">
-        {features.map((item) => (
-          <li key={item}>• {item}</li>
-        ))}
-      </ul>
-      <div className="mt-auto">
-        <button
-          type="button"
-          onClick={handleClick}
-          className={`inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium transition-colors transition-transform duration-150 hover:-translate-y-0.5 ${
-            highlight
-              ? "bg-brand-primary text-white hover:bg-[#ff291e]"
-              : "border border-white/10 text-brand-text hover:border-brand-accent hover:text-brand-accent"
-          }`}
-        >
-          Get Started
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // Public landing page root
 export default function Landing() {
   const router = useRouter();
@@ -377,43 +312,6 @@ export default function Landing() {
       quote: "My Atlanta clients love that their demos already sound like playlist records.",
       name: "Marcus Lane",
       role: "Producer · Atlanta, USA 🇺🇸",
-    },
-  ];
-
-  const tiers: Tier[] = [
-    {
-      name: "Starter",
-      price: "Pay as you go",
-      description: "Only pay for the services you need.",
-      features: [
-        "Audio cleanup – $10 per track",
-        "Mixing only – $29 per song",
-        "Mixing & mastering – $59 per song",
-        "Mastering only – $25 per song",
-      ],
-    },
-    {
-      name: "Creator",
-      price: "$24",
-      description: "For active artists and producers.",
-      highlight: true,
-      features: [
-        "40 masters per month",
-        "Full stem mixing support",
-        "A/B comparison + presets",
-        "Priority support",
-      ],
-    },
-    {
-      name: "Pro",
-      price: "$59",
-      description: "For studios and heavy users.",
-      features: [
-        "Unlimited bounces (fair use)",
-        "Team accounts (coming soon)",
-        "Custom sound profiles",
-        "Early access to new AI chains",
-      ],
     },
   ];
 
@@ -669,9 +567,47 @@ export default function Landing() {
           </div>
 
           <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {tiers.map((tier) => (
-              <TierCard key={tier.name} {...tier} />
-            ))}
+            <PricingCard
+              kind="payg"
+              name="Pay-as-you-go"
+              price="From $4.99"
+              unit="/ track"
+              description="Perfect for one-off projects and testing MIXSMVRT."
+              features={[
+                "Audio cleanup from $4.99 per track",
+                "Mixing & mastering options per song",
+                "No monthly commitment",
+              ]}
+              ctaLabel="See pay-as-you-go"
+            />
+            <PricingCard
+              kind="subscription"
+              name="Creator Plan"
+              price="$19.99"
+              description="For active artists and producers dropping regularly."
+              features={[
+                "6 × Audio cleanup per month",
+                "3 × Mixing only per month",
+                "1 × Mastering only per month",
+                "Standard presets & queue",
+              ]}
+              ctaLabel="View Creator plan"
+            />
+            <PricingCard
+              kind="subscription"
+              name="Pro Artist Plan"
+              price="$39.99"
+              description="For serious artists and small studios."
+              features={[
+                "10 × Audio cleanup per month",
+                "6 × Mixing only per month",
+                "3 × Mix + master per month",
+                "All premium presets & priority queue",
+              ]}
+              badge="Most Popular"
+              highlight
+              ctaLabel="View Pro Artist plan"
+            />
           </div>
         </div>
       </section>
