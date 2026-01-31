@@ -64,9 +64,9 @@ export default function TrackPluginRack({ plugins, onChange, onOpen, hidePlugins
   };
 
   return (
-    <div className="flex items-start gap-2">
-      <div className="flex flex-col">
-        <div className="grid grid-cols-4 gap-1">
+    <div className="flex w-full items-start gap-2">
+      <div className="flex w-full flex-col">
+        <div className="grid w-full grid-cols-8 gap-1">
           {Array.from({ length: MAX_SLOTS }).map((_, index) => {
             const plugin = sorted.find((p) => p.order === index);
             if (!plugin) {
