@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "../../lib/supabaseClient";
-import { PAYG_SERVICES, SUBSCRIPTION_PLANS, FREE_PLAN } from "../../lib/pricing";
+import { PAYG_SERVICES, SUBSCRIPTION_PLANS, FREE_PLAN, type SubscriptionPlan } from "../../lib/pricing";
 import PricingCard from "../../components/pricing/PricingCard";
 
 export default function PricingPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [mode, setMode] = useState<"payg" | "subscription">("payg");
+  const [billingPrices, setBillingPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -40,6 +41,43 @@ export default function PricingPage() {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    let isMounted = true;
+
+    supabase
+      .from("billing_plans")
+      .select("key, price_month")
+      .then(({ data, error }) => {
+        if (!isMounted || error || !data) return;
+        const map: Record<string, number> = {};
+        for (const row of data as { key: string; price_month: number | null }[]) {
+          if (row.key && typeof row.price_month === "number") {
+            map[row.key] = row.price_month;
+          }
+        }
+        setBillingPrices(map);
+      })
+      .catch(() => {
+        // ignore – fall back to static prices
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const getSubscriptionPriceLabel = (plan: SubscriptionPlan) => {
+    if (plan.id === "creator" && typeof billingPrices.creator === "number") {
+      return `$${billingPrices.creator.toFixed(2)}`;
+    }
+    if (plan.id === "pro-artist" && typeof billingPrices.pro === "number") {
+      return `$${billingPrices.pro.toFixed(2)}`;
+    }
+    return plan.price;
+  };
 
   const goToPlan = (slug: "starter" | "creator" | "pro") => {
     if (user) {
@@ -127,7 +165,7 @@ export default function PricingPage() {
                   key={plan.id}
                   kind="subscription"
                   name={plan.name}
-                  price={plan.price}
+                  price={getSubscriptionPriceLabel(plan)}
                   description={plan.tagline}
                   features={plan.includes}
                   badge={plan.badge}
