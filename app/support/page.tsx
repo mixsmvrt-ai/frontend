@@ -1,20 +1,45 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 import { ProtectedPage } from "../../components/ProtectedPage";
 import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
 
 export default function SupportPage() {
+  const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadUser() {
+      if (!isSupabaseConfigured || !supabase) return;
+
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (user) {
+        setUserId(user.id ?? null);
+        if (user.email) {
+          setEmail(user.email);
+        }
+      }
+    }
+
+    void loadUser();
+  }, []);
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setErrorMessage(null);
     setStatus("idle");
+
+    if (!email.trim()) {
+      setErrorMessage("Please add an email address so we can reply.");
+      return;
+    }
 
     if (!subject.trim() || !message.trim()) {
       setErrorMessage("Please add a subject and message before sending.");
@@ -28,12 +53,8 @@ export default function SupportPage() {
 
     setIsSubmitting(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-      const userId = user?.id ?? null;
-      const email = user?.email ?? "unknown@mixsmvrt.com";
-
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = API_URL.replace(/\/$/, "");
       const res = await fetch(`${baseUrl}/api/support/tickets`, {
         method: "POST",
         headers: {
@@ -41,7 +62,7 @@ export default function SupportPage() {
         },
         body: JSON.stringify({
           user_id: userId,
-          email,
+          email: email.trim(),
           subject: subject.trim(),
           message: message.trim(),
         }),
@@ -75,6 +96,16 @@ export default function SupportPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="mt-4 space-y-3 text-xs">
+            <div>
+              <label className="text-[11px] font-medium text-white/70">Email</label>
+              <input
+                type="email"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-red-500 focus:outline-none"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
             <div>
               <label className="text-[11px] font-medium text-white/70">Subject</label>
               <input
