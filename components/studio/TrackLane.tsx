@@ -582,9 +582,13 @@ export default function TrackLane({
         if (!panner) {
           panner = (ac as any).createStereoPanner();
         }
-        panner.pan.value = track.pan ?? 0;
-        pannerRef.current = panner;
-        filters.push(panner);
+        if (panner) {
+          panner.pan.value = track.pan ?? 0;
+          pannerRef.current = panner;
+          filters.push(panner);
+        } else {
+          pannerRef.current = null;
+        }
       } else {
         pannerRef.current = null;
       }
