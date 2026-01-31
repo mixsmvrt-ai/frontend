@@ -786,12 +786,6 @@ export default function TrackLane({
 
   // Rebuild plugin filter graph when plugins change.
   useEffect(() => {
-    const backend = backendRef.current;
-    const ac = audioContextRef.current;
-    const analyser = analyserRef.current;
-
-    if (!backend || !ac || !analyser || typeof backend.setFilters !== "function") return;
-
     if (pluginApplyRafRef.current != null) {
       cancelAnimationFrame(pluginApplyRafRef.current);
       pluginApplyRafRef.current = null;
