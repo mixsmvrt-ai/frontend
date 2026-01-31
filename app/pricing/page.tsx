@@ -1,72 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "../../lib/supabaseClient";
-
-const tiers = [
-  {
-    name: "Starter",
-    price: "Pay as you go",
-    headline: "Only pay for what you need",
-    description:
-      "Pick a service per project – from simple audio cleanup to full mix & master.",
-    features: [
-      "Audio cleanup – $10 per track",
-      "Mixing only – $29 per song",
-      "Mixing & mastering – $59 per song",
-      "Mastering only – $25 per song",
-    ],
-  },
-  {
-    name: "Creator",
-    price: "$24",
-    headline: "For active artists & producers",
-    description:
-      "Release regularly and collaborate often? Keep your mix and master quality steady across tracks.",
-    highlight: true,
-    features: [
-      "40 masters per month",
-      "Full stem mixing support",
-      "Presets + A/B comparison",
-      "Priority support",
-    ],
-  },
-  {
-    name: "Pro",
-    price: "$59",
-    headline: "For studios & power users",
-    description:
-      "Ideal for small studios, producers with multiple artists, and content teams handling many drops.",
-    features: [
-      "Unlimited masters (fair use)",
-      "Team accounts (coming soon)",
-      "Custom sound profiles",
-      "Early access to new AI chains",
-    ],
-  },
-];
-
-type TierName = "Starter" | "Creator" | "Pro";
-
-function getPlanSlug(name: TierName) {
-  switch (name) {
-    case "Starter":
-      return "starter";
-    case "Creator":
-      return "creator";
-    case "Pro":
-      return "pro";
-    default:
-      return "starter";
-  }
-}
+import { PAYG_SERVICES, SUBSCRIPTION_PLANS, FREE_PLAN } from "../../lib/pricing";
+import PricingCard from "../../components/pricing/PricingCard";
 
 export default function PricingPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [mode, setMode] = useState<"payg" | "subscription">("payg");
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -97,15 +41,21 @@ export default function PricingPage() {
     };
   }, []);
 
-  const handleGetStarted = (tierName: TierName) => {
-    const slug = getPlanSlug(tierName);
-
+  const goToPlan = (slug: "starter" | "creator" | "pro") => {
     if (user) {
       router.push(`/pricing/${slug}`);
-      return;
+    } else {
+      router.push(`/signup?plan=${slug}`);
     }
+  };
 
-    router.push(`/signup?plan=${slug}`);
+  const handlePayAsYouGo = () => {
+    goToPlan("starter");
+  };
+
+  const handleSubscription = (id: "creator" | "pro-artist") => {
+    const slug = id === "creator" ? "creator" : "pro";
+    goToPlan(slug);
   };
 
   return (
@@ -116,60 +66,78 @@ export default function PricingPage() {
             Pricing
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-brand-text sm:text-3xl">
-            Simple plans for serious creators.
+            Studio-quality sound without studio prices.
           </h1>
           <p className="mt-3 text-sm text-brand-muted">
-            MIXSMVRT replaces hours of manual tweaking with a focused AI mix and master
-            chain. Choose a plan that matches how often you release music or content.
+            Choose pay-as-you-go for one-off tracks or a monthly plan if you&apos;re dropping
+            music regularly.
           </p>
         </header>
 
-        <section
-          className="mt-8 grid gap-4 sm:gap-5 md:grid-cols-3"
-          aria-label="Pricing tiers"
-        >
-          {tiers.map((tier) => (
-            <div
-              key={tier.name}
-              className={`flex flex-col rounded-2xl border bg-brand-surface/80 p-5 text-sm transition-colors transition-transform duration-150 hover:-translate-y-0.5 ${
-                tier.highlight
-                  ? "border-brand-primary shadow-[0_0_40px_rgba(225,6,0,0.6)]"
-                  : "border-white/5"
+        <section className="mt-8" aria-label="Pricing options">
+          <div className="inline-flex rounded-full border border-white/10 bg-black/40 p-1 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setMode("payg")}
+              className={`rounded-full px-3 py-1 font-medium transition-colors transition-transform duration-150 ${
+                mode === "payg"
+                  ? "bg-brand-primary text-black shadow-[0_0_18px_rgba(225,6,0,0.7)]"
+                  : "text-brand-muted hover:text-brand-text"
               }`}
             >
-              <div className="mb-4">
-                <h2 className="text-base font-semibold text-brand-text">{tier.name}</h2>
-                <p className="mt-1 text-xs text-brand-accent">{tier.headline}</p>
-                <p className="mt-2 text-xs text-brand-muted">{tier.description}</p>
-              </div>
-              <div className="mb-4 flex items-baseline gap-1">
-                <span className="text-2xl font-semibold text-brand-text">{tier.price}</span>
-                {tier.name === "Starter" ? (
-                  <span className="text-xs text-brand-muted">• per-project pricing</span>
-                ) : (
-                  <span className="text-xs text-brand-muted">/ month</span>
-                )}
-              </div>
-              <ul className="mb-4 space-y-1 text-xs text-brand-muted">
-                {tier.features.map((feature: string) => (
-                  <li key={feature}>• {feature}</li>
-                ))}
-              </ul>
-              <div className="mt-auto">
-                <button
-                  type="button"
-                  onClick={() => handleGetStarted(tier.name as TierName)}
-                  className={`inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium transition-colors transition-transform duration-150 hover:-translate-y-0.5 ${
-                    tier.highlight
-                      ? "bg-brand-primary text-white hover:bg-[#ff291e]"
-                      : "border border-white/15 text-brand-text hover:border-brand-accent hover:text-brand-accent"
-                  }`}
-                >
-                  Get Started
-                </button>
-              </div>
+              Pay-as-you-go
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("subscription")}
+              className={`rounded-full px-3 py-1 font-medium transition-colors transition-transform duration-150 ${
+                mode === "subscription"
+                  ? "bg-brand-primary text-black shadow-[0_0_18px_rgba(225,6,0,0.7)]"
+                  : "text-brand-muted hover:text-brand-text"
+              }`}
+            >
+              Monthly plans
+            </button>
+          </div>
+
+          {mode === "payg" ? (
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {PAYG_SERVICES.map((service) => (
+                <PricingCard
+                  key={service.id}
+                  kind="payg"
+                  name={service.name}
+                  price={service.price}
+                  unit={service.unit}
+                  description={service.description}
+                  features={["Pay once per track – no subscription"]}
+                  addOns={service.addOns.map((addon) => ({
+                    name: addon.name,
+                    price: addon.price,
+                  }))}
+                  ctaLabel={service.ctaLabel}
+                  onCtaClick={handlePayAsYouGo}
+                />
+              ))}
             </div>
-          ))}
+          ) : (
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {SUBSCRIPTION_PLANS.map((plan) => (
+                <PricingCard
+                  key={plan.id}
+                  kind="subscription"
+                  name={plan.name}
+                  price={plan.price}
+                  description={plan.tagline}
+                  features={plan.includes}
+                  badge={plan.badge}
+                  highlight={plan.id === "pro-artist"}
+                  ctaLabel={plan.ctaLabel}
+                  onCtaClick={() => handleSubscription(plan.id)}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="mt-10 grid gap-4 text-sm text-brand-muted sm:gap-6 md:grid-cols-2">
@@ -188,6 +156,30 @@ export default function PricingPage() {
               cycle or tour run, that’s cool – we’ll be here when you come back.
             </p>
           </div>
+        </section>
+
+        <section className="mt-10 rounded-2xl border border-white/8 bg-black/80 p-5 text-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-brand-accent">
+                Free tier
+              </p>
+              <h2 className="mt-1 text-sm font-semibold text-brand-text">{FREE_PLAN.headline}</h2>
+              <p className="mt-2 text-xs text-brand-muted">{FREE_PLAN.description}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/signup")}
+              className="mt-2 inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-[13px] font-semibold text-white shadow-[0_0_30px_rgba(225,6,0,0.7)] transition-colors transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#ff291e] sm:mt-0"
+            >
+              {FREE_PLAN.ctaLabel}
+            </button>
+          </div>
+          <ul className="mt-3 grid gap-2 text-[11px] text-brand-muted sm:grid-cols-2">
+            {FREE_PLAN.bullets.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
         </section>
       </div>
     </main>
