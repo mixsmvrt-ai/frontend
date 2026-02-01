@@ -1443,7 +1443,14 @@ export default function MixStudio() {
     }
 
     const genreKey = GENRE_TO_DSP_KEY[genre];
-    if (genreKey) {
+    const isBgOrAdlibVocal =
+      trackType === "vocal" && (track.role === "background" || track.role === "adlib");
+
+    // For lead vocals and non-vocal tracks, keep sending the genre so the
+    // DSP can route to the main genre chain. For background/adlib vocals,
+    // we let the ``preset`` name (with _bg/_adlib suffix) drive routing so
+    // they can use dedicated chains.
+    if (genreKey && !isBgOrAdlibVocal) {
       formData.append("genre", genreKey);
     }
 
