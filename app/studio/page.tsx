@@ -64,6 +64,14 @@ export type TrackType = {
   regions?: StudioRegion[];
 };
 
+type ProcessedTrackResult = {
+  file: File;
+  urls?: {
+    wav?: string | null;
+    mp3?: string | null;
+  };
+};
+
 type StudioMode =
   | "cleanup"
   | "mix-only"
@@ -1046,7 +1054,7 @@ export default function MixStudio() {
   const processTrackWithAI = async (
     track: TrackType,
     options?: { forceMaster?: boolean },
-  ): Promise<File | null> => {
+  ): Promise<ProcessedTrackResult | null> => {
     if (!track.file) return null;
 
     const formData = new FormData();
@@ -1252,7 +1260,7 @@ export default function MixStudio() {
     }
 
     try {
-      const updates = new Map<string, File>();
+      const updates = new Map<string, ProcessedTrackResult>();
       let anyUpdated = false;
 
       // Process each track that has audio through the AI DSP service
