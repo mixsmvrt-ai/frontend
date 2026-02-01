@@ -1736,6 +1736,48 @@ export default function MixStudio() {
           }));
           setOverlayStages(dynamicStages);
         }
+
+        // Throttle DSP load across users by waiting until this job is
+        // at the front of the queue for its feature_type before
+        // starting the per-track DSP processing loop below.
+        if (featureType && data.id) {
+          try {
+            const maxWaitMs = 10 * 60 * 1000; // safety: 10 minutes
+            const pollIntervalMs = 2000;
+            const start = Date.now();
+
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+              if (processingCancelRef.current) break;
+              if (Date.now() - start > maxWaitMs) break;
+
+              const statusRes = await fetch(`${BACKEND_URL}/status/${data.id}`);
+              if (!statusRes.ok) break;
+
+              const statusJson = (await statusRes.json()) as {
+                status: string;
+                queue_position?: number | null;
+                queue_size?: number | null;
+              };
+
+              if (statusJson.status === "failed" || statusJson.status === "completed") {
+                break;
+              }
+
+              const pos = statusJson.queue_position ?? null;
+              const size = statusJson.queue_size ?? null;
+
+              if (pos === 1 || !size || size <= 1) {
+                // We are at the front of the line (or effectively alone).
+                break;
+              }
+
+              await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+            }
+          } catch {
+            // If queue polling fails, fall through and continue processing.
+          }
+        }
       } else {
         // eslint-disable-next-line no-console
         console.error("Failed to create backend processing job", await res.text());
