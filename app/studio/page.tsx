@@ -702,11 +702,18 @@ export default function MixStudio() {
         let filtered = data;
 
         if (genreKey) {
-          filtered = filtered.filter((p) => {
-            if (!p.genre || p.genre === "any") return true;
+          // First, try strict genre matching. If we find any presets whose
+          // genre matches the selected key, only show those. If none match,
+          // fall back to the full list so the selector is never empty.
+          const strictMatches = data.filter((p) => {
+            if (!p.genre || p.genre === "any") return false;
             const g = p.genre.toLowerCase();
             return g === genreKey || g.includes(genreKey);
           });
+
+          if (strictMatches.length > 0) {
+            filtered = strictMatches;
+          }
         }
 
         // When mixing or mastering a beat-only session, only show Beat presets.
