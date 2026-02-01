@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { DataTable, type Column } from "../../../components/admin/DataTable";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -64,8 +65,55 @@ export default function AdminPaymentsPage() {
           <h2 className="text-sm font-semibold text-white">Revenue</h2>
           <span className="text-[11px] text-zinc-500">Last 30 days</span>
         </div>
-        <div className="flex h-40 items-center justify-center rounded-2xl border border-white/10 bg-black/60 text-[11px] text-zinc-500">
-          Revenue chart temporarily disabled (Recharts not installed).
+        <div className="h-40 rounded-2xl border border-white/10 bg-black/60 px-3 py-2">
+          {revenueSeries.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-[11px] text-zinc-500">
+              No revenue data yet.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={revenueSeries} margin={{ top: 4, right: 8, bottom: 4, left: -12 }}>
+                <defs>
+                  <linearGradient id="revenueArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
+                  minTickGap={16}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
+                  width={32}
+                />
+                <Tooltip
+                  cursor={{ stroke: "#22c55e", strokeWidth: 1, strokeOpacity: 0.4 }}
+                  formatter={(value: number) => [`$${value.toFixed(2)}`, "Revenue"]}
+                  contentStyle={{
+                    backgroundColor: "#020617",
+                    borderRadius: 8,
+                    border: "1px solid rgba(148,163,184,0.4)",
+                    fontSize: 11,
+                  }}
+                  labelStyle={{ color: "#e5e7eb" }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="#22c55e"
+                  strokeWidth={1.8}
+                  fill="url(#revenueArea)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </section>
 
