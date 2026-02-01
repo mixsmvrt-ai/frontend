@@ -433,6 +433,104 @@ function buildAIPluginsForTrack(
       }
     }
 
+    // For mixing and mix+master vocal flows, use the selected
+    // Studio preset id (when available) to further shape the
+    // visible chain so that presets with the same genre still
+    // feel and sound different.
+    if (featureType !== "audio_cleanup" && studioPresetId) {
+      const vocalPresetId = studioPresetId;
+
+      if (
+        vocalPresetId === "trap_vocal_modern" ||
+        vocalPresetId === "trap_dh_lead_air"
+      ) {
+        // Bright, modern trap/dancehall leads.
+        addEqPreset = "eq_air";
+        deessPreset = "deess_bright";
+        satPreset = "sat_parallel_crunch";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_eighth_pingpong";
+      } else if (vocalPresetId === "dancehall_vocal_punchy") {
+        // Punchy, club-focused dancehall.
+        subEqPreset = "eq_sub_trap_dh";
+        addEqPreset = "eq_air";
+        deessPreset = "deess_bright";
+        satPreset = "sat_tube_edge";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_vocal_slap";
+      } else if (vocalPresetId === "reggae_vocal_natural") {
+        // Natural, warmer reggae vocal.
+        subEqPreset = "eq_sub_reggae";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_soft";
+        satPreset = "sat_tape_warm";
+        reverbPreset = "rev_small_room";
+        delayPreset = "del_vocal_slap";
+      } else if (vocalPresetId === "rnb_vocal_smooth") {
+        // Smooth, wide R&B lead.
+        subEqPreset = "eq_sub_rnb";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_soft";
+        satPreset = "sat_tape_warm";
+        reverbPreset = "rev_big_hall";
+        delayPreset = "del_quarter_wide";
+      } else if (vocalPresetId === "afrobeat_vocal_bright") {
+        // Bright, forward afrobeat vocal.
+        subEqPreset = "eq_sub_afrobeat";
+        addEqPreset = "eq_air";
+        deessPreset = "deess_bright";
+        satPreset = "sat_parallel_crunch";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_eighth_pingpong";
+      } else if (vocalPresetId === "afrobeat_vocal_silk") {
+        // Smoother afrobeat option.
+        subEqPreset = "eq_sub_afrobeat";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_soft";
+        satPreset = "sat_tape_warm";
+        reverbPreset = "rev_big_hall";
+        delayPreset = "del_quarter_wide";
+      } else if (vocalPresetId === "reggaeton_vocal_wide") {
+        // Wide, modern reggaeton.
+        addEqPreset = "eq_air";
+        deessPreset = "deess_bright";
+        satPreset = "sat_parallel_crunch";
+        reverbPreset = "rev_big_hall";
+        delayPreset = "del_quarter_wide";
+      } else if (vocalPresetId === "rock_vocal_grit") {
+        // More edge and bite for rock.
+        addEqPreset = "eq_air";
+        deessPreset = "deess_bright";
+        satPreset = "sat_tube_edge";
+        reverbPreset = "rev_small_room";
+        delayPreset = "del_vocal_slap";
+      } else if (vocalPresetId === "rap_vocal_aggressive") {
+        // Dense, aggressive rap vocal.
+        subEqPreset = "eq_sub_rap";
+        addEqPreset = "eq_air";
+        deessPreset = "deess_bright";
+        satPreset = "sat_parallel_crunch";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_eighth_pingpong";
+      } else if (vocalPresetId === "hiphop_vocal_clarity") {
+        // Focus on intelligibility.
+        subEqPreset = "eq_sub_hiphop";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_vocal_standard";
+        satPreset = "sat_tape_warm";
+        reverbPreset = "rev_small_room";
+        delayPreset = "del_vocal_slap";
+      } else if (vocalPresetId === "clean_pop_vocal") {
+        // Polished but relatively clean pop vocal.
+        subEqPreset = "eq_sub_generic";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_soft";
+        satPreset = "sat_tape_warm";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_quarter_wide";
+      }
+    }
+
     if (featureType === "audio_cleanup") {
       // Cleanup flow: focus on removing noise and harshness,
       // keep the chain lean and dry so it visually differs from
@@ -518,6 +616,79 @@ function buildAIPluginsForTrack(
         break;
     }
 
+    // Beat-only mixing presets: gently bias the bus chain
+    // so that each preset has a slightly different flavour
+    // even though they share the same DSP entry point.
+    if (studioPresetId && featureType === "mixing_only") {
+      const beatPresetId = studioPresetId;
+
+      if (beatPresetId === "beat_balance_clean") {
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_gentle";
+        busGluePreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+      } else if (beatPresetId === "bass_controlled_beat") {
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+      } else if (beatPresetId === "club_beat_punch") {
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_punch";
+        limPreset = "lim_loud";
+        stereoPreset = "stereo_safe";
+      } else if (beatPresetId === "beat_stereo_polish") {
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_gentle";
+        busGluePreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+      } else if (beatPresetId === "vintage_beat_warmth") {
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_warm";
+        busTightPreset = "bus_glue_gentle";
+        busGluePreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_mono_check";
+      } else if (beatPresetId === "minimal_beat_processing") {
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_warm";
+        busTightPreset = "bus_glue_gentle";
+        busGluePreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+      } else if (beatPresetId === "trap_beat_tight") {
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_punch";
+        limPreset = "lim_loud";
+        stereoPreset = "stereo_safe";
+      } else if (beatPresetId === "afrobeat_groove_balance") {
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+      } else if (beatPresetId === "trap_beat_knock") {
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_punch";
+        limPreset = "lim_loud";
+        stereoPreset = "stereo_safe";
+      } else if (beatPresetId === "afrobeat_club_beat") {
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_punch";
+        limPreset = "lim_loud";
+        stereoPreset = "stereo_safe";
+      }
+    }
+
     plugins.push(
       createPlugin("Mastering EQ", subMeqPreset, "AI Subtractive EQ", 0),
       createPlugin("Master Bus Compressor", busTightPreset, "AI Tight Bus Comp", 1),
@@ -586,6 +757,131 @@ function buildAIPluginsForTrack(
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
         break;
+    }
+
+    // Full-mix and master-only presets: shape the bus chain so
+    // each preset id nudges the EQ, compression, limiting and
+    // stereo choices a bit differently.
+    if (studioPresetId && (featureType === "mix_master" || featureType === "mastering_only")) {
+      const busPresetId = studioPresetId;
+
+      if (featureType === "mix_master") {
+        if (busPresetId === "radio_ready_mix" || busPresetId === "clean_commercial_mix") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "loud_modern_mix" || busPresetId === "punchy_urban_mix") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_punch";
+          busGluePreset = "bus_glue_punch";
+          limPreset = "lim_loud";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "streaming_optimized_mix") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "club_ready_mix") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_punch";
+          busGluePreset = "bus_glue_punch";
+          limPreset = "lim_loud";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "warm_analog_mix") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_warm";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_mono_check";
+        } else if (busPresetId === "vocal_forward_mix") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "bass_heavy_mix") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_warm";
+          busTightPreset = "bus_glue_punch";
+          busGluePreset = "bus_glue_punch";
+          limPreset = "lim_loud";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "wide_stereo_mix") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_safe";
+        }
+      } else if (featureType === "mastering_only") {
+        if (busPresetId === "streaming_master_minus14" || busPresetId === "transparent_master") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "loud_club_master" || busPresetId === "edm_loud_master") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_punch";
+          busGluePreset = "bus_glue_punch";
+          limPreset = "lim_loud";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "radio_master") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "beat_sale_master") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_warm";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "warm_analog_master") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_warm";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_mono_check";
+        } else if (busPresetId === "bass_focus_master") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_warm";
+          busTightPreset = "bus_glue_punch";
+          busGluePreset = "bus_glue_punch";
+          limPreset = "lim_loud";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "wide_stereo_master") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_gentle";
+          busGluePreset = "bus_glue_gentle";
+          limPreset = "lim_streaming";
+          stereoPreset = "stereo_safe";
+        } else if (busPresetId === "clean_hiphop_master") {
+          subMeqPreset = "meq_warm";
+          addMeqPreset = "meq_bright";
+          busTightPreset = "bus_glue_punch";
+          busGluePreset = "bus_glue_punch";
+          limPreset = "lim_loud";
+          stereoPreset = "stereo_safe";
+        }
+      }
     }
 
     plugins.push(
