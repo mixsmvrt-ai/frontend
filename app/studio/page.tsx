@@ -183,8 +183,12 @@ function buildAIPluginsForTrack(
   trackType: "vocal" | "beat" | "master",
   presetName: string,
   genreKey?: string,
+  role?: TrackType["role"],
 ): TrackPlugin[] {
   const ctx = `${presetName || ""} ${genreKey || ""}`.toLowerCase();
+
+  const isBackgroundVocal = trackType === "vocal" && role === "background";
+  const isAdlibVocal = trackType === "vocal" && role === "adlib";
 
   let flavour: "trap_dh" | "afrobeat" | "hiphop" | "rap" | "rnb" | "reggae" | "dancehall" | "generic" =
     "generic";
@@ -266,7 +270,10 @@ function buildAIPluginsForTrack(
       case "trap_dh":
       case "rap":
       case "hiphop":
-        subEqPreset = "eq_vocal_clarity";
+        // More aggressive modern vocals – use a warmer, slightly
+        // cutting curve for subtractive EQ and a brighter stage
+        // for additive EQ.
+        subEqPreset = "eq_warmth";
         addEqPreset = "eq_air";
         levelCompPreset = "comp_fast_tamer";
         glueCompPreset = "comp_soft_glue";
@@ -306,7 +313,7 @@ function buildAIPluginsForTrack(
         delayPreset = "del_vocal_slap";
         break;
       case "dancehall":
-        subEqPreset = "eq_vocal_clarity";
+        subEqPreset = "eq_warmth";
         addEqPreset = "eq_air";
         levelCompPreset = "comp_fast_tamer";
         glueCompPreset = "comp_soft_glue";
@@ -325,6 +332,37 @@ function buildAIPluginsForTrack(
         reverbPreset = "rev_small_room";
         delayPreset = "del_vocal_slap";
         break;
+    }
+
+    // Post-flavour tweaks for background/adlib roles so the
+    // visible plugin chain mirrors the dedicated DSP paths.
+    if (isBackgroundVocal) {
+      // Backgrounds: darker, softer, more space, less density.
+      // Keep subtractive EQ as warmth, but avoid the brightest
+      // additive curves and use softer dynamics and FX.
+      if (addEqPreset === "eq_air") {
+        addEqPreset = "eq_vocal_clarity";
+      }
+      levelCompPreset = "comp_vocal_leveler";
+      glueCompPreset = "comp_soft_glue";
+      deessPreset = "deess_soft";
+      satPreset = "sat_tape_warm";
+
+      if (flavour === "rnb" || flavour === "afrobeat" || flavour === "reggae") {
+        reverbPreset = "rev_big_hall";
+        delayPreset = delayPreset || "del_quarter_wide";
+      } else {
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = delayPreset || "del_quarter_wide";
+      }
+    } else if (isAdlibVocal) {
+      // Adlibs: brighter, more hyped and wetter, sitting behind
+      // the lead but with obvious character.
+      addEqPreset = "eq_air";
+      deessPreset = "deess_bright";
+      satPreset = "sat_parallel_crunch";
+      reverbPreset = "rev_big_hall";
+      delayPreset = "del_eighth_pingpong";
     }
 
     plugins.push(
@@ -1509,7 +1547,13 @@ export default function MixStudio() {
       type: blob.type || "audio/wav",
     });
 
-    const aiPlugins = buildAIPluginsForTrack(track.id, trackType, presetName, genreKey);
+    const aiPlugins = buildAIPluginsForTrack(
+      track.id,
+      trackType,
+      presetName,
+      genreKey,
+      track.role,
+    );
 
     return {
       file: processedFile,
