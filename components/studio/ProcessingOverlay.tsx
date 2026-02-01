@@ -90,6 +90,10 @@ export interface ProcessingOverlayState {
 interface ProcessingOverlayProps {
   state: ProcessingOverlayState | null;
   stages?: ProcessingStage[];
+  // Optional queue metadata so a parent can show where this
+  // job sits in line when many users are processing.
+  queuePosition?: number | null;
+  queueSize?: number | null;
   onCancel?: () => void;
   onDownload?: () => void;
 }
@@ -192,7 +196,7 @@ function WaveformSkeleton() {
   );
 }
 
-export function ProcessingOverlay({ state, stages, onCancel, onDownload }: ProcessingOverlayProps) {
+export function ProcessingOverlay({ state, stages, queuePosition, queueSize, onCancel, onDownload }: ProcessingOverlayProps) {
   if (!state || !state.active) return null;
 
   const { mode, percentage, currentStageId, completedStageIds, tracks, error } = state;
@@ -227,6 +231,11 @@ export function ProcessingOverlay({ state, stages, onCancel, onDownload }: Proce
     };
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
+              {typeof queuePosition === "number" && typeof queueSize === "number" && queueSize > 1 && (
+                <span className="text-[10px] text-amber-300">
+                  Queue: you are #{queuePosition} of {queueSize} for this flow
+                </span>
+              )}
     } catch {
       // no-op
     }
