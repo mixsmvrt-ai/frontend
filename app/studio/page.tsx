@@ -1107,6 +1107,14 @@ export default function MixStudio() {
         JSON.stringify({ preset_overrides: referenceProfile }),
       );
     }
+    // Thread the studio's musical key/scale through to the DSP so
+    // pitch correction can lock to the correct scale.
+    if (sessionKey) {
+      formData.append("session_key", sessionKey);
+    }
+    if (sessionScale) {
+      formData.append("session_scale", sessionScale);
+    }
     const response = await fetch(`${DSP_URL}/process`, {
       method: "POST",
       body: formData,
