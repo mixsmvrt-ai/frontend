@@ -54,6 +54,12 @@ export type TrackType = {
   solo?: boolean;
   // Visually indicate that this track's audio has been processed/mastered.
   processed?: boolean;
+   // Optional URLs returned from the DSP service for this track's
+   // processed audio in different formats (e.g. WAV, MP3).
+   renderUrls?: {
+     wav?: string | null;
+     mp3?: string | null;
+   };
   plugins?: TrackPlugin[];
   regions?: StudioRegion[];
 };
@@ -1105,20 +1111,26 @@ export default function MixStudio() {
 
     const data: {
       status?: string;
-      output_file?: string;
+      output_file?: string | null;
+      output_files?: { wav?: string | null; mp3?: string | null };
       track_type?: string;
       preset?: string;
     } = await response.json();
 
-    if (data.status !== "processed" || !data.output_file) {
+    if (data.status !== "processed") {
       return null;
     }
 
-    const outputUrl = data.output_file.startsWith("http")
-      ? data.output_file
-      : `${DSP_URL}${data.output_file}`;
+    const rawWav = data.output_files?.wav ?? data.output_file;
+    if (!rawWav) {
+      return null;
+    }
 
-    const outResp = await fetch(outputUrl);
+    const wavUrl = rawWav.startsWith("http") ? rawWav : `${DSP_URL}${rawWav}`;
+    const rawMp3 = data.output_files?.mp3 ?? null;
+    const mp3Url = rawMp3 ? (rawMp3.startsWith("http") ? rawMp3 : `${DSP_URL}${rawMp3}`) : null;
+
+    const outResp = await fetch(wavUrl);
     if (!outResp.ok) {
       throw new Error("Failed to download processed audio");
     }
@@ -1128,7 +1140,13 @@ export default function MixStudio() {
       type: blob.type || "audio/wav",
     });
 
-    return processedFile;
+    return {
+      file: processedFile,
+      urls: {
+        wav: wavUrl,
+        mp3: mp3Url,
+      },
+    };
   };
 
   const handleProcessFullMix = async () => {
@@ -1319,17 +1337,18 @@ export default function MixStudio() {
 
       if (!processingCancelRef.current && updates.size > 0) {
         setTracks((prev) => {
-          let next = prev.map((track) =>
-            updates.has(track.id)
-              ? {
-                  ...track,
-                  file: updates.get(track.id) ?? track.file,
-                  // Mark tracks whose audio has been updated by the AI
-                  // pipeline so their waveforms can appear "bigger".
-                  processed: true,
-                }
-              : track,
-          );
+          let next = prev.map((track) => {
+            const updated = updates.get(track.id);
+            if (!updated) return track;
+            return {
+              ...track,
+              file: updated.file ?? track.file,
+              // Mark tracks whose audio has been updated by the AI
+              // pipeline so their waveforms can appear "bigger".
+              processed: true,
+              renderUrls: updated.urls ?? track.renderUrls,
+            };
+          });
 
           // For mix & master sessions, automatically rebalance background
           // vocals and adlibs so they sit under and around the lead.
@@ -1403,8 +1422,9 @@ export default function MixStudio() {
             track.id === targetId
               ? {
                   ...track,
-                  file: processed,
+                  file: processed.file,
                   processed: true,
+                  renderUrls: processed.urls ?? track.renderUrls,
                 }
               : track,
           ),
@@ -1418,21 +1438,42 @@ export default function MixStudio() {
     }
   };
 
-  const handleDownloadMixOnly = () => {
+  type DownloadFormat = "wav" | "mp3" | "both";
+
+  const handleDownloadProcessed = (format: DownloadFormat) => {
     if (!hasMixed) return;
     const playableTracks = tracks.filter((track) => track.file);
     if (!playableTracks.length) return;
 
-    playableTracks.forEach((track) => {
-      if (!track.file) return;
-      const url = URL.createObjectURL(track.file);
+    const triggerDownload = (url: string, filename: string) => {
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${track.name || track.id}-mix.wav`;
+      anchor.download = filename;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
+    };
+
+    playableTracks.forEach((track) => {
+      const baseName = `${track.name || track.id}-mix`;
+
+      if (format === "wav" || format === "both") {
+        const wavUrl = track.renderUrls?.wav;
+        if (wavUrl) {
+          triggerDownload(wavUrl, `${baseName}.wav`);
+        } else if (track.file) {
+          const url = URL.createObjectURL(track.file);
+          triggerDownload(url, `${baseName}.wav`);
+          URL.revokeObjectURL(url);
+        }
+      }
+
+      if (format === "mp3" || format === "both") {
+        const mp3Url = track.renderUrls?.mp3;
+        if (mp3Url) {
+          triggerDownload(mp3Url, `${baseName}.mp3`);
+        }
+      }
     });
   };
 
@@ -2075,7 +2116,7 @@ export default function MixStudio() {
           processingOverlay.mode === "mix" &&
           hasMixed &&
           tracks.some((track) => track.file)
-            ? handleDownloadMixOnly
+            ? () => handleDownloadProcessed("both")
             : undefined
         }
       />
@@ -2289,8 +2330,9 @@ export default function MixStudio() {
                             t.id === trackId
                               ? {
                                   ...t,
-                                  file: processed,
+                                  file: processed.file,
                                   processed: true,
+                                  renderUrls: processed.urls ?? t.renderUrls,
                                 }
                               : t,
                           ),
@@ -2487,14 +2529,32 @@ export default function MixStudio() {
                 </>
               ) : (
                 (isMasterOnlyMode || isMixOnlyMode || isCleanupMode || isPodcastMode) && hasMixed && (
-                  <button
-                    type="button"
-                    onClick={handleDownloadMixOnly}
-                    disabled={!hasMixed || !tracks.some((track) => track.file)}
-                    className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
-                  >
-                    {isMasterOnlyMode ? "Download Master" : "Download Processed"}
-                  </button>
+                  <div className="inline-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadProcessed("wav")}
+                      disabled={!hasMixed || !tracks.some((track) => track.file)}
+                      className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
+                    >
+                      {isMasterOnlyMode ? "Download WAV Master" : "Download WAV"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadProcessed("mp3")}
+                      disabled={!hasMixed || !tracks.some((track) => track.file)}
+                      className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
+                    >
+                      {isMasterOnlyMode ? "Download MP3 Master" : "Download MP3"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadProcessed("both")}
+                      disabled={!hasMixed || !tracks.some((track) => track.file)}
+                      className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
+                    >
+                      {isMasterOnlyMode ? "Download Both" : "Download WAV+MP3"}
+                    </button>
+                  </div>
                 )
               )}
             </div>
