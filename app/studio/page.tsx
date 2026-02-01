@@ -643,11 +643,18 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
 export default function MixStudio() {
   const router = useRouter();
   const [authChecking, setAuthChecking] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [userFeatureAccess, setUserFeatureAccess] = useState<Record<FeatureType, boolean>>({
     audio_cleanup: false,
     mixing_only: false,
     mix_master: false,
     mastering_only: false,
+  });
+  const [featureCredits, setFeatureCredits] = useState<Record<FeatureType, number | null>>({
+    audio_cleanup: null,
+    mixing_only: null,
+    mix_master: null,
+    mastering_only: null,
   });
   const [isAdmin, setIsAdmin] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState<FeatureType | null>(null);
@@ -678,6 +685,63 @@ export default function MixStudio() {
           return;
         }
         const email = data.session.user?.email;
+        const uid = data.session.user?.id;
+        if (uid) {
+          setUserId(uid);
+
+          // Load current credits so the studio can show remaining usage.
+          (async () => {
+            try {
+              const res = await fetch(
+                `${BACKEND_URL}/studio/credits?user_id=${encodeURIComponent(uid)}`,
+              );
+              if (!res.ok) return;
+              const json = await res.json();
+              const credits = (json?.credits ?? []) as {
+                feature_type: string;
+                remaining_uses: number;
+              }[];
+
+              const nextAccess: Record<FeatureType, boolean> = {
+                audio_cleanup: false,
+                mixing_only: false,
+                mix_master: false,
+                mastering_only: false,
+              };
+              const nextCredits: Record<FeatureType, number | null> = {
+                audio_cleanup: null,
+                mixing_only: null,
+                mix_master: null,
+                mastering_only: null,
+              };
+
+              credits.forEach((credit) => {
+                const ft = credit.feature_type as FeatureType;
+                if (
+                  ft === "audio_cleanup" ||
+                  ft === "mixing_only" ||
+                  ft === "mix_master" ||
+                  ft === "mastering_only"
+                ) {
+                  const remaining = Number(credit.remaining_uses ?? 0);
+                  if (remaining < 0) {
+                    // Treat negative remaining as unlimited.
+                    nextCredits[ft] = null;
+                    nextAccess[ft] = true;
+                  } else {
+                    nextCredits[ft] = remaining;
+                    nextAccess[ft] = remaining > 0;
+                  }
+                }
+              });
+
+              setFeatureCredits(nextCredits);
+              setUserFeatureAccess(nextAccess);
+            } catch {
+              // If credit lookup fails, leave access unchanged.
+            }
+          })();
+        }
         if (email && email.toLowerCase() === "mixsmvrt@gmail.com") {
           setIsAdmin(true);
         }
@@ -1639,7 +1703,7 @@ export default function MixStudio() {
         "full_mix";
 
       const payload = {
-        user_id: null as string | null,
+        user_id: userId,
         feature_type: featureType,
         job_type: jobType,
         preset_id: selectedPresetId,
@@ -2166,6 +2230,9 @@ export default function MixStudio() {
   } else {
     primaryActionLabel = isProcessing ? "Processing Mix..." : "Process Full Mix";
   }
+
+  const primaryFeatureCredits: number | null | undefined =
+    featureForMode != null ? featureCredits[featureForMode] : undefined;
 
   const buildProjectMeta = useCallback(() => {
     const trackLayout = tracks.map((track) => ({
@@ -3061,6 +3128,13 @@ export default function MixStudio() {
                   {featureForMode === "mastering_only" && "Mastering Only"}
                   {!featureForMode && "Full Mix"}
                 </span>
+                {featureForMode && (
+                  <span className="text-[10px] text-white/50">
+                    {primaryFeatureCredits == null
+                      ? "Credits: unlimited"
+                      : `Credits left: ${primaryFeatureCredits}`}
+                  </span>
+                )}
               </div>
               <button
                 type="button"
