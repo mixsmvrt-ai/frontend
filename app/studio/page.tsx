@@ -2648,6 +2648,8 @@ export default function MixStudio() {
       <ProcessingOverlay
         state={processingOverlay}
         stages={overlayStages}
+        queuePosition={backendJobStatus?.queue_position ?? null}
+        queueSize={backendJobStatus?.queue_size ?? null}
         onCancel={handleCancelProcessingOverlay}
         onDownload={
           processingOverlay &&
