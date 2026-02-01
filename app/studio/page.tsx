@@ -184,9 +184,26 @@ function buildAIPluginsForTrack(
   presetName: string,
   genreKey?: string,
 ): TrackPlugin[] {
-  const lowerContext = `${presetName || ""} ${genreKey || ""}`.toLowerCase();
-  const isAggressiveGenre = /trap|dancehall|rap|hiphop/.test(lowerContext);
-  const isWarmGenre = /afrobeat|rnb|reggae/.test(lowerContext);
+  const ctx = `${presetName || ""} ${genreKey || ""}`.toLowerCase();
+
+  let flavour: "trap_dh" | "afrobeat" | "hiphop" | "rap" | "rnb" | "reggae" | "dancehall" | "generic" =
+    "generic";
+
+  if (ctx.includes("trap_dancehall") || (ctx.includes("trap") && ctx.includes("dancehall"))) {
+    flavour = "trap_dh";
+  } else if (ctx.includes("dancehall")) {
+    flavour = "dancehall";
+  } else if (ctx.includes("afrobeat")) {
+    flavour = "afrobeat";
+  } else if (ctx.includes("hiphop") || ctx.includes("hip-hop")) {
+    flavour = "hiphop";
+  } else if (ctx.includes("rap")) {
+    flavour = "rap";
+  } else if (ctx.includes("rnb") || ctx.includes("r&b")) {
+    flavour = "rnb";
+  } else if (ctx.includes("reggae")) {
+    flavour = "reggae";
+  }
 
   const createPlugin = (
     type: Parameters<typeof defaultPluginParams>[0],
@@ -236,28 +253,65 @@ function buildAIPluginsForTrack(
   const plugins: TrackPlugin[] = [];
 
   if (trackType === "vocal") {
-    const eqPreset = isAggressiveGenre
-      ? "eq_air"
-      : isWarmGenre
-        ? "eq_warmth"
-        : "eq_vocal_clarity";
-    const compPreset = isAggressiveGenre
-      ? "comp_fast_tamer"
-      : "comp_vocal_leveler";
-    const deessPreset = isAggressiveGenre
-      ? "deess_bright"
-      : isWarmGenre
-        ? "deess_soft"
-        : "deess_vocal_standard";
-    const satPreset = isAggressiveGenre
-      ? "sat_tube_edge"
-      : isWarmGenre
-        ? "sat_tape_warm"
-        : "sat_parallel_crunch";
-    const reverbPreset = isAggressiveGenre ? "rev_vocal_plate" : "rev_small_room";
-    const delayPreset = isAggressiveGenre
-      ? "del_eighth_pingpong"
-      : "del_vocal_slap";
+    let eqPreset: string;
+    let compPreset: string;
+    let deessPreset: string;
+    let satPreset: string;
+    let reverbPreset: string;
+    let delayPreset: string | null = null;
+
+    switch (flavour) {
+      case "trap_dh":
+      case "rap":
+      case "hiphop":
+        eqPreset = "eq_air";
+        compPreset = "comp_fast_tamer";
+        deessPreset = "deess_bright";
+        satPreset = "sat_parallel_crunch";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_eighth_pingpong";
+        break;
+      case "afrobeat":
+        eqPreset = "eq_vocal_clarity";
+        compPreset = "comp_vocal_leveler";
+        deessPreset = "deess_vocal_standard";
+        satPreset = "sat_tape_warm";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_quarter_wide";
+        break;
+      case "rnb":
+        eqPreset = "eq_warmth";
+        compPreset = "comp_soft_glue";
+        deessPreset = "deess_soft";
+        satPreset = "sat_tape_warm";
+        reverbPreset = "rev_big_hall";
+        delayPreset = "del_quarter_wide";
+        break;
+      case "reggae":
+        eqPreset = "eq_warmth";
+        compPreset = "comp_soft_glue";
+        deessPreset = "deess_soft";
+        satPreset = "sat_tape_warm";
+        reverbPreset = "rev_small_room";
+        delayPreset = "del_vocal_slap";
+        break;
+      case "dancehall":
+        eqPreset = "eq_air";
+        compPreset = "comp_fast_tamer";
+        deessPreset = "deess_bright";
+        satPreset = "sat_tube_edge";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_vocal_slap";
+        break;
+      default:
+        eqPreset = "eq_vocal_clarity";
+        compPreset = "comp_vocal_leveler";
+        deessPreset = "deess_vocal_standard";
+        satPreset = "sat_parallel_crunch";
+        reverbPreset = "rev_small_room";
+        delayPreset = "del_vocal_slap";
+        break;
+    }
 
     plugins.push(
       createPlugin("EQ", eqPreset, "AI Vocal EQ", 0),
@@ -265,30 +319,114 @@ function buildAIPluginsForTrack(
       createPlugin("Compressor", compPreset, "AI Vocal Comp", 2),
       createPlugin("Saturation", satPreset, "AI Saturation", 3),
       createPlugin("Reverb", reverbPreset, "AI Reverb", 4),
-      createPlugin("Delay", delayPreset, "AI Delay", 5),
+      ...(delayPreset ? [createPlugin("Delay", delayPreset, "AI Delay", 5)] : []),
     );
   } else if (trackType === "beat") {
-    const meqPreset = isAggressiveGenre ? "meq_bright" : "meq_warm";
-    const busPreset = isAggressiveGenre ? "bus_glue_punch" : "bus_glue_gentle";
-    const limPreset = isAggressiveGenre ? "lim_loud" : "lim_streaming";
+    let meqPreset: string;
+    let busPreset: string;
+    let limPreset: string;
+    let stereoPreset: string;
+
+    switch (flavour) {
+      case "trap_dh":
+      case "rap":
+      case "hiphop":
+        meqPreset = "meq_bright";
+        busPreset = "bus_glue_punch";
+        limPreset = "lim_loud";
+        stereoPreset = "stereo_safe";
+        break;
+      case "afrobeat":
+        meqPreset = "meq_warm";
+        busPreset = "bus_glue_punch";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+        break;
+      case "rnb":
+        meqPreset = "meq_warm";
+        busPreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+        break;
+      case "reggae":
+        meqPreset = "meq_warm";
+        busPreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_mono_check";
+        break;
+      case "dancehall":
+        meqPreset = "meq_bright";
+        busPreset = "bus_glue_punch";
+        limPreset = "lim_loud";
+        stereoPreset = "stereo_safe";
+        break;
+      default:
+        meqPreset = "meq_warm";
+        busPreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+        break;
+    }
 
     plugins.push(
       createPlugin("Mastering EQ", meqPreset, "AI Beat EQ", 0),
       createPlugin("Master Bus Compressor", busPreset, "AI Bus Comp", 1),
-      createPlugin("Stereo Imager", "stereo_safe", "AI Stereo", 2),
+      createPlugin("Stereo Imager", stereoPreset, "AI Stereo", 2),
       createPlugin("Limiter", limPreset, "AI Limiter", 3),
     );
   } else {
     // Master or instrumental bus
-    const meqPreset = isAggressiveGenre ? "meq_bright" : "meq_warm";
-    const busPreset = isAggressiveGenre ? "bus_glue_punch" : "bus_glue_gentle";
-    const limPreset = isAggressiveGenre ? "lim_loud" : "lim_streaming";
+    let meqPreset: string;
+    let busPreset: string;
+    let limPreset: string;
+    let stereoPreset: string;
+
+    switch (flavour) {
+      case "trap_dh":
+      case "rap":
+      case "hiphop":
+        meqPreset = "meq_bright";
+        busPreset = "bus_glue_punch";
+        limPreset = "lim_loud";
+        stereoPreset = "stereo_safe";
+        break;
+      case "afrobeat":
+        meqPreset = "meq_warm";
+        busPreset = "bus_glue_punch";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+        break;
+      case "rnb":
+        meqPreset = "meq_warm";
+        busPreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+        break;
+      case "reggae":
+        meqPreset = "meq_warm";
+        busPreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_mono_check";
+        break;
+      case "dancehall":
+        meqPreset = "meq_bright";
+        busPreset = "bus_glue_punch";
+        limPreset = "lim_loud";
+        stereoPreset = "stereo_safe";
+        break;
+      default:
+        meqPreset = "meq_warm";
+        busPreset = "bus_glue_gentle";
+        limPreset = "lim_streaming";
+        stereoPreset = "stereo_safe";
+        break;
+    }
 
     plugins.push(
       createPlugin("Mastering EQ", meqPreset, "AI Master EQ", 0),
       createPlugin("Master Bus Compressor", busPreset, "AI Master Bus", 1),
       createPlugin("Limiter", limPreset, "AI Master Limiter", 2),
-      createPlugin("Stereo Imager", "stereo_safe", "AI Stereo", 3),
+      createPlugin("Stereo Imager", stereoPreset, "AI Stereo", 3),
     );
   }
 
