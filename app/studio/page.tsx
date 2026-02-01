@@ -26,6 +26,7 @@ import {
   defaultAIParams,
   defaultPluginName,
   defaultPluginParams,
+  getPluginPresets,
   isPluginType,
 } from "../../components/studio/pluginTypes";
 import type { PluginWindowPosition } from "../../components/studio/PluginWindow";
@@ -70,6 +71,9 @@ type ProcessedTrackResult = {
     wav?: string | null;
     mp3?: string | null;
   };
+  // Optional AI-generated plugin chain that reflects what the
+  // assistant applied for this processing pass.
+  plugins?: TrackPlugin[];
 };
 
 type StudioMode =
@@ -173,6 +177,123 @@ const GENRE_TO_DSP_KEY: Record<string, string> = {
   "R&B": "rnb",
   Reggae: "reggae",
 };
+
+function buildAIPluginsForTrack(
+  trackId: string,
+  trackType: "vocal" | "beat" | "master",
+  presetName: string,
+  genreKey?: string,
+): TrackPlugin[] {
+  const lowerContext = `${presetName || ""} ${genreKey || ""}`.toLowerCase();
+  const isAggressiveGenre = /trap|dancehall|rap|hiphop/.test(lowerContext);
+  const isWarmGenre = /afrobeat|rnb|reggae/.test(lowerContext);
+
+  const createPlugin = (
+    type: Parameters<typeof defaultPluginParams>[0],
+    presetId?: string,
+    nameOverride?: string,
+    order: number = 0,
+  ): TrackPlugin => {
+    const baseParams = defaultPluginParams(type);
+    const baseAIParams = defaultAIParams(type);
+
+    let params = { ...baseParams };
+    let aiParams = { ...baseAIParams };
+    let preset: string | undefined;
+
+    if (presetId) {
+      const presets = getPluginPresets(type);
+      const match = presets.find((p) => p.id === presetId);
+      if (match) {
+        params = {
+          ...baseParams,
+          ...match.params,
+        };
+        aiParams = {
+          ...baseAIParams,
+          ...match.params,
+        };
+        preset = match.id;
+      }
+    }
+
+    return {
+      id: crypto.randomUUID(),
+      pluginId: crypto.randomUUID(),
+      trackId,
+      pluginType: type,
+      name: nameOverride || defaultPluginName(type),
+      order,
+      params,
+      aiParams,
+      preset,
+      enabled: true,
+      aiGenerated: true,
+      locked: false,
+    };
+  };
+
+  const plugins: TrackPlugin[] = [];
+
+  if (trackType === "vocal") {
+    const eqPreset = isAggressiveGenre
+      ? "eq_air"
+      : isWarmGenre
+        ? "eq_warmth"
+        : "eq_vocal_clarity";
+    const compPreset = isAggressiveGenre
+      ? "comp_fast_tamer"
+      : "comp_vocal_leveler";
+    const deessPreset = isAggressiveGenre
+      ? "deess_bright"
+      : isWarmGenre
+        ? "deess_soft"
+        : "deess_vocal_standard";
+    const satPreset = isAggressiveGenre
+      ? "sat_tube_edge"
+      : isWarmGenre
+        ? "sat_tape_warm"
+        : "sat_parallel_crunch";
+    const reverbPreset = isAggressiveGenre ? "rev_vocal_plate" : "rev_small_room";
+    const delayPreset = isAggressiveGenre
+      ? "del_eighth_pingpong"
+      : "del_vocal_slap";
+
+    plugins.push(
+      createPlugin("EQ", eqPreset, "AI Vocal EQ", 0),
+      createPlugin("De-esser", deessPreset, "AI De-Esser", 1),
+      createPlugin("Compressor", compPreset, "AI Vocal Comp", 2),
+      createPlugin("Saturation", satPreset, "AI Saturation", 3),
+      createPlugin("Reverb", reverbPreset, "AI Reverb", 4),
+      createPlugin("Delay", delayPreset, "AI Delay", 5),
+    );
+  } else if (trackType === "beat") {
+    const meqPreset = isAggressiveGenre ? "meq_bright" : "meq_warm";
+    const busPreset = isAggressiveGenre ? "bus_glue_punch" : "bus_glue_gentle";
+    const limPreset = isAggressiveGenre ? "lim_loud" : "lim_streaming";
+
+    plugins.push(
+      createPlugin("Mastering EQ", meqPreset, "AI Beat EQ", 0),
+      createPlugin("Master Bus Compressor", busPreset, "AI Bus Comp", 1),
+      createPlugin("Stereo Imager", "stereo_safe", "AI Stereo", 2),
+      createPlugin("Limiter", limPreset, "AI Limiter", 3),
+    );
+  } else {
+    // Master or instrumental bus
+    const meqPreset = isAggressiveGenre ? "meq_bright" : "meq_warm";
+    const busPreset = isAggressiveGenre ? "bus_glue_punch" : "bus_glue_gentle";
+    const limPreset = isAggressiveGenre ? "lim_loud" : "lim_streaming";
+
+    plugins.push(
+      createPlugin("Mastering EQ", meqPreset, "AI Master EQ", 0),
+      createPlugin("Master Bus Compressor", busPreset, "AI Master Bus", 1),
+      createPlugin("Limiter", limPreset, "AI Master Limiter", 2),
+      createPlugin("Stereo Imager", "stereo_safe", "AI Stereo", 3),
+    );
+  }
+
+  return plugins;
+}
 
 function getInitialTracksForMode(mode: StudioMode): TrackType[] {
   switch (mode) {
@@ -1100,7 +1221,8 @@ export default function MixStudio() {
 
     const selectedPreset =
       availablePresets.find((p) => p.id === selectedPresetId) ?? availablePresets[0];
-    const presetName = selectedPreset?.dsp_chain_reference ||
+    const presetName =
+      selectedPreset?.dsp_chain_reference ||
       (trackType === "beat" || trackType === "master" ? "streaming_master" : "clean_vocal");
 
     formData.append("file", track.file);
@@ -1186,12 +1308,15 @@ export default function MixStudio() {
       type: blob.type || "audio/wav",
     });
 
+    const aiPlugins = buildAIPluginsForTrack(track.id, trackType, presetName, genreKey);
+
     return {
       file: processedFile,
       urls: {
         wav: wavUrl,
         mp3: mp3Url,
       },
+      plugins: aiPlugins,
     };
   };
 
@@ -1386,6 +1511,25 @@ export default function MixStudio() {
           let next = prev.map((track) => {
             const updated = updates.get(track.id);
             if (!updated) return track;
+
+            let plugins = track.plugins;
+            if (updated.plugins && updated.plugins.length > 0) {
+              const existing = Array.isArray(track.plugins) ? track.plugins : [];
+              const userPlugins = existing.filter((p) => !p.aiGenerated);
+              const baseOrder = userPlugins.length;
+              const normalizedUser = userPlugins.map((p, index) => ({
+                ...p,
+                trackId: track.id,
+                order: index,
+              }));
+              const normalizedAI = updated.plugins.map((p, index) => ({
+                ...p,
+                trackId: track.id,
+                order: baseOrder + index,
+              }));
+              plugins = [...normalizedUser, ...normalizedAI];
+            }
+
             return {
               ...track,
               file: updated.file ?? track.file,
@@ -1393,6 +1537,7 @@ export default function MixStudio() {
               // pipeline so their waveforms can appear "bigger".
               processed: true,
               renderUrls: updated.urls ?? track.renderUrls,
+              plugins,
             };
           });
 
@@ -1464,16 +1609,35 @@ export default function MixStudio() {
       if (processed) {
         const targetId = target.id;
         setTracks((prev) =>
-          prev.map((track) =>
-            track.id === targetId
-              ? {
-                  ...track,
-                  file: processed.file,
-                  processed: true,
-                  renderUrls: processed.urls ?? track.renderUrls,
-                }
-              : track,
-          ),
+          prev.map((track) => {
+            if (track.id !== targetId) return track;
+
+            let plugins = track.plugins;
+            if (processed.plugins && processed.plugins.length > 0) {
+              const existing = Array.isArray(track.plugins) ? track.plugins : [];
+              const userPlugins = existing.filter((p) => !p.aiGenerated);
+              const baseOrder = userPlugins.length;
+              const normalizedUser = userPlugins.map((p, index) => ({
+                ...p,
+                trackId: track.id,
+                order: index,
+              }));
+              const normalizedAI = processed.plugins.map((p, index) => ({
+                ...p,
+                trackId: track.id,
+                order: baseOrder + index,
+              }));
+              plugins = [...normalizedUser, ...normalizedAI];
+            }
+
+            return {
+              ...track,
+              file: processed.file,
+              processed: true,
+              renderUrls: processed.urls ?? track.renderUrls,
+              plugins,
+            };
+          }),
         );
       }
     } catch (error) {
@@ -2372,16 +2536,35 @@ export default function MixStudio() {
                       const processed = await processTrackWithAI(current);
                       if (processed) {
                         setTracks((prev) =>
-                          prev.map((t) =>
-                            t.id === trackId
-                              ? {
-                                  ...t,
-                                  file: processed.file,
-                                  processed: true,
-                                  renderUrls: processed.urls ?? t.renderUrls,
-                                }
-                              : t,
-                          ),
+                          prev.map((t) => {
+                            if (t.id !== trackId) return t;
+
+                            let plugins = t.plugins;
+                            if (processed.plugins && processed.plugins.length > 0) {
+                              const existing = Array.isArray(t.plugins) ? t.plugins : [];
+                              const userPlugins = existing.filter((p) => !p.aiGenerated);
+                              const baseOrder = userPlugins.length;
+                              const normalizedUser = userPlugins.map((p, index) => ({
+                                ...p,
+                                trackId: t.id,
+                                order: index,
+                              }));
+                              const normalizedAI = processed.plugins.map((p, index) => ({
+                                ...p,
+                                trackId: t.id,
+                                order: baseOrder + index,
+                              }));
+                              plugins = [...normalizedUser, ...normalizedAI];
+                            }
+
+                            return {
+                              ...t,
+                              file: processed.file,
+                              processed: true,
+                              renderUrls: processed.urls ?? t.renderUrls,
+                              plugins,
+                            };
+                          }),
                         );
                       }
                     } catch (error) {
