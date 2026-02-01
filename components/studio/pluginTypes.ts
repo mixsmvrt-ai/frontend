@@ -282,7 +282,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
           params: {
             // Strongest subtractive curve – close to the
             // Trap Dancehall DSP preset.
-            low_freq: 140,
+            low_freq: 95,
             low_gain: -3.0,
             low_q: 0.8,
             low_type: "Shelf",
@@ -314,7 +314,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
           id: "eq_sub_hiphop",
           name: "Subtractive Hip-Hop",
           params: {
-            low_freq: 160,
+            low_freq: 95,
             low_gain: -2.0,
             low_q: 0.8,
             low_type: "Shelf",
@@ -346,7 +346,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
           id: "eq_sub_rap",
           name: "Subtractive Rap",
           params: {
-            low_freq: 220,
+            low_freq: 95,
             low_gain: -2.5,
             low_q: 0.8,
             low_type: "Shelf",
@@ -378,7 +378,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
           id: "eq_sub_afrobeat",
           name: "Subtractive Afrobeat",
           params: {
-            low_freq: 170,
+            low_freq: 95,
             low_gain: -1.5,
             low_q: 0.8,
             low_type: "Shelf",
@@ -410,7 +410,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
           id: "eq_sub_rnb",
           name: "Subtractive R&B",
           params: {
-            low_freq: 150,
+            low_freq: 95,
             low_gain: -0.5,
             low_q: 0.8,
             low_type: "Shelf",
@@ -442,7 +442,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
           id: "eq_sub_reggae",
           name: "Subtractive Reggae",
           params: {
-            low_freq: 170,
+            low_freq: 95,
             low_gain: -0.5,
             low_q: 0.8,
             low_type: "Shelf",
@@ -474,7 +474,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
           id: "eq_sub_generic",
           name: "Subtractive Generic",
           params: {
-            low_freq: 150,
+            low_freq: 95,
             low_gain: -1.5,
             low_q: 0.8,
             low_type: "Shelf",
