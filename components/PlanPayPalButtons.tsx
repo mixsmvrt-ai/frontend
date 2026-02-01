@@ -1,12 +1,17 @@
 "use client";
 
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
 interface PlanPayPalButtonsProps {
   planName: string;
   amountLabel: string;
   onSuccess?: () => void;
   onCancel?: () => void;
+  // Optional: when used for pay-as-you-go, describe which feature
+  // the user is purchasing credits for and how many.
+  featureType?: "audio_cleanup" | "mixing_only" | "mix_master" | "mastering_only";
+  quantity?: number;
 }
 
 function parseAmount(amountLabel: string): string {
@@ -15,7 +20,7 @@ function parseAmount(amountLabel: string): string {
   return match[1];
 }
 
-export function PlanPayPalButtons({ planName, amountLabel, onSuccess, onCancel }: PlanPayPalButtonsProps) {
+export function PlanPayPalButtons({ planName, amountLabel, onSuccess, onCancel, featureType, quantity }: PlanPayPalButtonsProps) {
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 
   if (!clientId) {
@@ -36,6 +41,16 @@ export function PlanPayPalButtons({ planName, amountLabel, onSuccess, onCancel }
         ? Math.round(amountNumber * 100)
         : 0;
 
+      let userId: string | undefined;
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          userId = data.session?.user?.id;
+        } catch {
+          // Ignore – credits will still be granted manually if needed.
+        }
+      }
+
       await fetch("/api/billing/capture", {
         method: "POST",
         headers: {
@@ -50,9 +65,12 @@ export function PlanPayPalButtons({ planName, amountLabel, onSuccess, onCancel }
             : planName.toLowerCase().includes("pro")
             ? "pro"
             : "starter",
+          user_id: userId,
           amount_cents: amountCents,
           provider: "paypal",
           provider_payment_id: details?.id ?? undefined,
+          feature_type: featureType,
+          quantity: typeof quantity === "number" && quantity > 0 ? quantity : undefined,
         }),
       });
     } catch {
