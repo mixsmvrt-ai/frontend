@@ -253,8 +253,10 @@ function buildAIPluginsForTrack(
   const plugins: TrackPlugin[] = [];
 
   if (trackType === "vocal") {
-    let eqPreset: string;
-    let compPreset: string;
+    let subEqPreset: string;
+    let addEqPreset: string;
+    let levelCompPreset: string;
+    let glueCompPreset: string;
     let deessPreset: string;
     let satPreset: string;
     let reverbPreset: string;
@@ -264,48 +266,60 @@ function buildAIPluginsForTrack(
       case "trap_dh":
       case "rap":
       case "hiphop":
-        eqPreset = "eq_air";
-        compPreset = "comp_fast_tamer";
+        subEqPreset = "eq_vocal_clarity";
+        addEqPreset = "eq_air";
+        levelCompPreset = "comp_fast_tamer";
+        glueCompPreset = "comp_soft_glue";
         deessPreset = "deess_bright";
         satPreset = "sat_parallel_crunch";
         reverbPreset = "rev_vocal_plate";
         delayPreset = "del_eighth_pingpong";
         break;
       case "afrobeat":
-        eqPreset = "eq_vocal_clarity";
-        compPreset = "comp_vocal_leveler";
+        subEqPreset = "eq_warmth";
+        addEqPreset = "eq_vocal_clarity";
+        levelCompPreset = "comp_vocal_leveler";
+        glueCompPreset = "comp_soft_glue";
         deessPreset = "deess_vocal_standard";
         satPreset = "sat_tape_warm";
         reverbPreset = "rev_vocal_plate";
         delayPreset = "del_quarter_wide";
         break;
       case "rnb":
-        eqPreset = "eq_warmth";
-        compPreset = "comp_soft_glue";
+        subEqPreset = "eq_warmth";
+        addEqPreset = "eq_air";
+        levelCompPreset = "comp_vocal_leveler";
+        glueCompPreset = "comp_soft_glue";
         deessPreset = "deess_soft";
         satPreset = "sat_tape_warm";
         reverbPreset = "rev_big_hall";
         delayPreset = "del_quarter_wide";
         break;
       case "reggae":
-        eqPreset = "eq_warmth";
-        compPreset = "comp_soft_glue";
+        subEqPreset = "eq_warmth";
+        addEqPreset = "eq_vocal_clarity";
+        levelCompPreset = "comp_vocal_leveler";
+        glueCompPreset = "comp_soft_glue";
         deessPreset = "deess_soft";
         satPreset = "sat_tape_warm";
         reverbPreset = "rev_small_room";
         delayPreset = "del_vocal_slap";
         break;
       case "dancehall":
-        eqPreset = "eq_air";
-        compPreset = "comp_fast_tamer";
+        subEqPreset = "eq_vocal_clarity";
+        addEqPreset = "eq_air";
+        levelCompPreset = "comp_fast_tamer";
+        glueCompPreset = "comp_soft_glue";
         deessPreset = "deess_bright";
         satPreset = "sat_tube_edge";
         reverbPreset = "rev_vocal_plate";
         delayPreset = "del_vocal_slap";
         break;
       default:
-        eqPreset = "eq_vocal_clarity";
-        compPreset = "comp_vocal_leveler";
+        subEqPreset = "eq_warmth";
+        addEqPreset = "eq_vocal_clarity";
+        levelCompPreset = "comp_vocal_leveler";
+        glueCompPreset = "comp_soft_glue";
         deessPreset = "deess_vocal_standard";
         satPreset = "sat_parallel_crunch";
         reverbPreset = "rev_small_room";
@@ -314,16 +328,20 @@ function buildAIPluginsForTrack(
     }
 
     plugins.push(
-      createPlugin("EQ", eqPreset, "AI Vocal EQ", 0),
+      createPlugin("EQ", subEqPreset, "AI Subtractive EQ", 0),
       createPlugin("De-esser", deessPreset, "AI De-Esser", 1),
-      createPlugin("Compressor", compPreset, "AI Vocal Comp", 2),
-      createPlugin("Saturation", satPreset, "AI Saturation", 3),
-      createPlugin("Reverb", reverbPreset, "AI Reverb", 4),
-      ...(delayPreset ? [createPlugin("Delay", delayPreset, "AI Delay", 5)] : []),
+      createPlugin("Compressor", levelCompPreset, "AI Level Comp", 2),
+      createPlugin("EQ", addEqPreset, "AI Additive EQ", 3),
+      createPlugin("Compressor", glueCompPreset, "AI Glue Comp", 4),
+      createPlugin("Saturation", satPreset, "AI Saturation", 5),
+      createPlugin("Reverb", reverbPreset, "AI Reverb", 6),
+      ...(delayPreset ? [createPlugin("Delay", delayPreset, "AI Delay", 7)] : []),
     );
   } else if (trackType === "beat") {
-    let meqPreset: string;
-    let busPreset: string;
+    let subMeqPreset: string;
+    let addMeqPreset: string;
+    let busTightPreset: string;
+    let busGluePreset: string;
     let limPreset: string;
     let stereoPreset: string;
 
@@ -331,53 +349,69 @@ function buildAIPluginsForTrack(
       case "trap_dh":
       case "rap":
       case "hiphop":
-        meqPreset = "meq_bright";
-        busPreset = "bus_glue_punch";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_punch";
         limPreset = "lim_loud";
         stereoPreset = "stereo_safe";
         break;
       case "afrobeat":
-        meqPreset = "meq_warm";
-        busPreset = "bus_glue_punch";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
         break;
       case "rnb":
-        meqPreset = "meq_warm";
-        busPreset = "bus_glue_gentle";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
         break;
       case "reggae":
-        meqPreset = "meq_warm";
-        busPreset = "bus_glue_gentle";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_mono_check";
         break;
       case "dancehall":
-        meqPreset = "meq_bright";
-        busPreset = "bus_glue_punch";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_punch";
         limPreset = "lim_loud";
         stereoPreset = "stereo_safe";
         break;
       default:
-        meqPreset = "meq_warm";
-        busPreset = "bus_glue_gentle";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
         break;
     }
 
     plugins.push(
-      createPlugin("Mastering EQ", meqPreset, "AI Beat EQ", 0),
-      createPlugin("Master Bus Compressor", busPreset, "AI Bus Comp", 1),
-      createPlugin("Stereo Imager", stereoPreset, "AI Stereo", 2),
-      createPlugin("Limiter", limPreset, "AI Limiter", 3),
+      createPlugin("Mastering EQ", subMeqPreset, "AI Subtractive EQ", 0),
+      createPlugin("Master Bus Compressor", busTightPreset, "AI Tight Bus Comp", 1),
+      createPlugin("Mastering EQ", addMeqPreset, "AI Additive EQ", 2),
+      createPlugin("Master Bus Compressor", busGluePreset, "AI Glue Bus Comp", 3),
+      createPlugin("Stereo Imager", stereoPreset, "AI Stereo", 4),
+      createPlugin("Limiter", limPreset, "AI Limiter", 5),
     );
   } else {
     // Master or instrumental bus
-    let meqPreset: string;
-    let busPreset: string;
+    let subMeqPreset: string;
+    let addMeqPreset: string;
+    let busTightPreset: string;
+    let busGluePreset: string;
     let limPreset: string;
     let stereoPreset: string;
 
@@ -385,48 +419,62 @@ function buildAIPluginsForTrack(
       case "trap_dh":
       case "rap":
       case "hiphop":
-        meqPreset = "meq_bright";
-        busPreset = "bus_glue_punch";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_punch";
         limPreset = "lim_loud";
         stereoPreset = "stereo_safe";
         break;
       case "afrobeat":
-        meqPreset = "meq_warm";
-        busPreset = "bus_glue_punch";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
         break;
       case "rnb":
-        meqPreset = "meq_warm";
-        busPreset = "bus_glue_gentle";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
         break;
       case "reggae":
-        meqPreset = "meq_warm";
-        busPreset = "bus_glue_gentle";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_mono_check";
         break;
       case "dancehall":
-        meqPreset = "meq_bright";
-        busPreset = "bus_glue_punch";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_punch";
         limPreset = "lim_loud";
         stereoPreset = "stereo_safe";
         break;
       default:
-        meqPreset = "meq_warm";
-        busPreset = "bus_glue_gentle";
+        subMeqPreset = "meq_warm";
+        addMeqPreset = "meq_bright";
+        busTightPreset = "bus_glue_punch";
+        busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
         break;
     }
 
     plugins.push(
-      createPlugin("Mastering EQ", meqPreset, "AI Master EQ", 0),
-      createPlugin("Master Bus Compressor", busPreset, "AI Master Bus", 1),
-      createPlugin("Limiter", limPreset, "AI Master Limiter", 2),
-      createPlugin("Stereo Imager", stereoPreset, "AI Stereo", 3),
+      createPlugin("Mastering EQ", subMeqPreset, "AI Subtractive EQ", 0),
+      createPlugin("Master Bus Compressor", busTightPreset, "AI Tight Master Comp", 1),
+      createPlugin("Mastering EQ", addMeqPreset, "AI Additive EQ", 2),
+      createPlugin("Master Bus Compressor", busGluePreset, "AI Glue Master Comp", 3),
+      createPlugin("Limiter", limPreset, "AI Master Limiter", 4),
+      createPlugin("Stereo Imager", stereoPreset, "AI Stereo", 5),
     );
   }
 
