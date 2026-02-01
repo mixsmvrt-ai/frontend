@@ -17,6 +17,9 @@ export interface BackendJobStatus {
   steps?: BackendStepStatus[] | null;
   estimated_total_sec?: number | null;
   elapsed_sec?: number | null;
+   queue_feature_type?: string | null;
+   queue_position?: number | null;
+   queue_size?: number | null;
 }
 
 interface UseBackendJobStatusOptions {
