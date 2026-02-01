@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ProtectedPage } from "../../../components/ProtectedPage";
 import { PlanPayPalButtons } from "../../../components/PlanPayPalButtons";
 import { PAYG_SERVICES, SUBSCRIPTION_PLANS } from "../../../lib/pricing";
+import { isSupabaseConfigured, supabase } from "../../../lib/supabaseClient";
 
 type PlanKey = "starter" | "creator" | "pro";
 
@@ -129,7 +130,43 @@ interface PlanPageProps {
 export default function PlanCheckoutPage({ params }: PlanPageProps) {
   const router = useRouter();
   const key = params.plan.toLowerCase() as PlanKey;
-  const plan = PLANS[key];
+  const [billingPrices, setBillingPrices] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    let isMounted = true;
+
+    supabase
+      .from("billing_plans")
+      .select("key, price_month")
+      .then(({ data, error }) => {
+        if (!isMounted || error || !data) return;
+        const map: Record<string, number> = {};
+        for (const row of data as { key: string; price_month: number | null }[]) {
+          if (row.key && typeof row.price_month === "number") {
+            map[row.key] = row.price_month;
+          }
+        }
+        setBillingPrices(map);
+      })
+      .catch(() => {
+        // ignore – fall back to static prices
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const basePlan = PLANS[key];
+
+  const plan =
+    key === "creator" && typeof billingPrices.creator === "number"
+      ? { ...basePlan, price: `$${billingPrices.creator.toFixed(2)}` }
+      : key === "pro" && typeof billingPrices.pro === "number"
+        ? { ...basePlan, price: `$${billingPrices.pro.toFixed(2)}` }
+        : basePlan;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
