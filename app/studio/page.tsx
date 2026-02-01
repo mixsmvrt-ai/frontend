@@ -184,6 +184,7 @@ function buildAIPluginsForTrack(
   presetName: string,
   genreKey?: string,
   role?: TrackType["role"],
+  featureType?: FeatureType,
 ): TrackPlugin[] {
   const ctx = `${presetName || ""} ${genreKey || ""}`.toLowerCase();
 
@@ -381,16 +382,30 @@ function buildAIPluginsForTrack(
       delayPreset = "del_eighth_pingpong";
     }
 
-    plugins.push(
-      createPlugin("EQ", subEqPreset, "AI Subtractive EQ", 0),
-      createPlugin("De-esser", deessPreset, "AI De-Esser", 1),
-      createPlugin("Compressor", levelCompPreset, "AI Level Comp", 2),
-      createPlugin("EQ", addEqPreset, "AI Additive EQ", 3),
-      createPlugin("Compressor", glueCompPreset, "AI Glue Comp", 4),
-      createPlugin("Saturation", satPreset, "AI Saturation", 5),
-      createPlugin("Reverb", reverbPreset, "AI Reverb", 6),
-      ...(delayPreset ? [createPlugin("Delay", delayPreset, "AI Delay", 7)] : []),
-    );
+    if (featureType === "audio_cleanup") {
+      // Cleanup flow: focus on removing noise and harshness,
+      // keep the chain lean and dry so it visually differs from
+      // mix / mix+master flows.
+      plugins.push(
+        createPlugin("EQ", subEqPreset, "AI Cleanup EQ", 0),
+        createPlugin("De-esser", deessPreset, "AI De-Esser", 1),
+        createPlugin("Compressor", levelCompPreset, "AI Level Comp", 2),
+        createPlugin("EQ", addEqPreset, "AI Tone EQ", 3),
+      );
+    } else {
+      // Mixing / mix+master and other vocal flows use the
+      // full creative chain.
+      plugins.push(
+        createPlugin("EQ", subEqPreset, "AI Subtractive EQ", 0),
+        createPlugin("De-esser", deessPreset, "AI De-Esser", 1),
+        createPlugin("Compressor", levelCompPreset, "AI Level Comp", 2),
+        createPlugin("EQ", addEqPreset, "AI Additive EQ", 3),
+        createPlugin("Compressor", glueCompPreset, "AI Glue Comp", 4),
+        createPlugin("Saturation", satPreset, "AI Saturation", 5),
+        createPlugin("Reverb", reverbPreset, "AI Reverb", 6),
+        ...(delayPreset ? [createPlugin("Delay", delayPreset, "AI Delay", 7)] : []),
+      );
+    }
   } else if (trackType === "beat") {
     let subMeqPreset: string;
     let addMeqPreset: string;
@@ -1561,6 +1576,7 @@ export default function MixStudio() {
     }
 
     const genreKey = GENRE_TO_DSP_KEY[genre];
+    const currentFeatureType = featureTypeForMode(studioMode) ?? null;
     const isBgOrAdlibVocal =
       trackType === "vocal" && (track.role === "background" || track.role === "adlib");
 
@@ -1633,6 +1649,7 @@ export default function MixStudio() {
       presetName,
       genreKey,
       track.role,
+      currentFeatureType || undefined,
     );
 
     return {
