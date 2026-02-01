@@ -663,7 +663,7 @@ export default function MixStudio() {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  // Load presets whenever the studio mode changes
+  // Load presets whenever the studio mode or genre/track context changes
   useEffect(() => {
     const mapModeToPresetMode = (mode: StudioMode): string | null => {
       if (mode === "cleanup") return "audio_cleanup";
@@ -691,20 +691,43 @@ export default function MixStudio() {
           return;
         }
         const data: StudioPresetMeta[] = await res.json();
-        setAvailablePresets(data);
+
+        // Genre-aware + beat-aware filtering for the preset selector.
+        const genreKey = GENRE_TO_DSP_KEY[genre];
+
+        const hasBeatOnly = tracks.some(
+          (t) => t.role === "beat" && t.file,
+        ) && !tracks.some((t) => t.role === "vocal" && t.file);
+
+        let filtered = data;
+
+        if (genreKey) {
+          filtered = filtered.filter((p) => {
+            if (!p.genre || p.genre === "any") return true;
+            const g = p.genre.toLowerCase();
+            return g === genreKey || g.includes(genreKey);
+          });
+        }
+
+        // When mixing or mastering a beat-only session, only show Beat presets.
+        if ((presetMode === "mixing_only" || presetMode === "mastering_only") && hasBeatOnly) {
+          filtered = filtered.filter((p) => p.target === "beat");
+        }
+
+        setAvailablePresets(filtered);
 
         const previous = lastPresetByModeRef.current[studioMode];
         let nextId: string | null = null;
 
-        if (previous && data.some((p) => p.id === previous)) {
+        if (previous && filtered.some((p) => p.id === previous)) {
           nextId = previous;
-        } else if (data.length) {
+        } else if (filtered.length) {
           // For full-mix studio flows, prefer presets that target the full mix
-          const fullMixPresets = data.filter((p) => p.target === "full_mix");
+          const fullMixPresets = filtered.filter((p) => p.target === "full_mix");
           if (fullMixPresets.length) {
             nextId = fullMixPresets[0].id;
           } else {
-            nextId = data[0].id;
+            nextId = filtered[0].id;
           }
         }
 
@@ -717,7 +740,7 @@ export default function MixStudio() {
       });
 
     return () => controller.abort();
-  }, [studioMode]);
+  }, [studioMode, genre, tracks]);
 
   // Ctrl + scroll zoom
   useEffect(() => {
