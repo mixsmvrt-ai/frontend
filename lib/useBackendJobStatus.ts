@@ -15,6 +15,8 @@ export interface BackendJobStatus {
   error_message?: string | null;
   output_files?: Record<string, any> | null;
   steps?: BackendStepStatus[] | null;
+  estimated_total_sec?: number | null;
+  elapsed_sec?: number | null;
 }
 
 interface UseBackendJobStatusOptions {
