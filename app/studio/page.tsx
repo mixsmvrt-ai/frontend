@@ -84,6 +84,57 @@ const DSP_URL = process.env.NEXT_PUBLIC_DSP_URL || "http://localhost:8001";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const MAX_HISTORY = 20;
 
+function applyAutoMixBalanceForMixMaster(tracks: TrackType[]): TrackType[] {
+  if (!tracks.length) return tracks;
+
+  const bgTracks = tracks.filter((t) => t.role === "background" && t.file);
+  const adlibTracks = tracks.filter((t) => t.role === "adlib" && t.file);
+
+  if (!bgTracks.length && !adlibTracks.length) {
+    // Nothing to rebalance for this mix.
+    return tracks;
+  }
+
+  const bgIndexById = new Map<string, number>(bgTracks.map((t, index) => [t.id, index]));
+  const adlibIndexById = new Map<string, number>(
+    adlibTracks.map((t, index) => [t.id, index]),
+  );
+
+  const gainFromDb = (db: number) => Math.pow(10, db / 20);
+
+  const bgPanPattern = [-0.35, 0.35, -0.2, 0.2];
+  const adlibPanPattern = [-0.6, 0.6, -0.4, 0.4];
+
+  return tracks.map((track) => {
+    if (!track.file) return track;
+
+    let volume = track.volume;
+    let pan = track.pan ?? 0;
+
+    if (track.role === "vocal") {
+      // Keep lead vocal strong and centered.
+      pan = 0;
+      volume = Math.min(1, volume * gainFromDb(0));
+    } else if (track.role === "background") {
+      const idx = bgIndexById.get(track.id) ?? 0;
+      pan = bgPanPattern[idx % bgPanPattern.length];
+      // Push backgrounds a bit down so they support the lead.
+      volume = Math.min(1, volume * gainFromDb(-6));
+    } else if (track.role === "adlib") {
+      const idx = adlibIndexById.get(track.id) ?? 0;
+      pan = adlibPanPattern[idx % adlibPanPattern.length];
+      // Adlibs sit lower and wider than the lead.
+      volume = Math.min(1, volume * gainFromDb(-9));
+    }
+
+    return {
+      ...track,
+      volume,
+      pan,
+    };
+  });
+}
+
 function featureTypeForMode(mode: StudioMode): FeatureType | null {
   if (mode === "cleanup") return "audio_cleanup";
   if (mode === "mix-only") return "mixing_only";
@@ -1267,8 +1318,8 @@ export default function MixStudio() {
       }
 
       if (!processingCancelRef.current && updates.size > 0) {
-        setTracks((prev) =>
-          prev.map((track) =>
+        setTracks((prev) => {
+          let next = prev.map((track) =>
             updates.has(track.id)
               ? {
                   ...track,
@@ -1278,8 +1329,16 @@ export default function MixStudio() {
                   processed: true,
                 }
               : track,
-          ),
-        );
+          );
+
+          // For mix & master sessions, automatically rebalance background
+          // vocals and adlibs so they sit under and around the lead.
+          if (studioMode === "mix-master") {
+            next = applyAutoMixBalanceForMixMaster(next);
+          }
+
+          return next;
+        });
       }
       setHasMixed(!processingCancelRef.current && anyUpdated);
       if (!processingCancelRef.current && anyUpdated) {
