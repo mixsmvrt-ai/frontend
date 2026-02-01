@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const BASE_URL = (API_URL as string).replace(/\/$/, "");
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -23,6 +27,31 @@ const navItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname() ?? "/admin";
+  const [openTicketCount, setOpenTicketCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadTicketStats() {
+      try {
+        const res = await fetch(`${BASE_URL}/admin/support/tickets/stats`, {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data: { total: number; open: number; resolved: number; closed: number } = await res.json();
+        if (!isMounted) return;
+        setOpenTicketCount(data.open);
+      } catch {
+        // Sidebar should remain functional even if stats fail to load.
+      }
+    }
+
+    void loadTicketStats();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <aside className="hidden w-60 flex-shrink-0 flex-col border-r border-white/10 bg-black/95/90 px-3 py-4 text-xs text-white/70 md:flex">
@@ -49,7 +78,14 @@ export function AdminSidebar() {
               <span className="text-base" aria-hidden>
                 {item.icon}
               </span>
-              <span>{item.label}</span>
+              <span className="flex flex-1 items-center justify-between">
+                <span>{item.label}</span>
+                {item.label === "Tickets" && openTicketCount && openTicketCount > 0 && (
+                  <span className="ml-2 inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-red-600/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    {openTicketCount}
+                  </span>
+                )}
+              </span>
             </Link>
           );
         })}
