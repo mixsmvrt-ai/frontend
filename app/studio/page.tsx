@@ -2528,11 +2528,11 @@ export default function MixStudio() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleDownloadMixOnly}
+                    onClick={() => handleDownloadProcessed("both")}
                     disabled={!hasMixed || !tracks.some((track) => track.file)}
                     className="rounded bg-zinc-800 px-4 py-2 text-sm text-white/80 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-800/50 disabled:text-white/40"
                   >
-                    Download Mix Only
+                    Download Mix WAV+MP3
                   </button>
                 </>
               ) : (
