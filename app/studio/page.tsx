@@ -747,6 +747,17 @@ export default function MixStudio() {
             "Something went wrong while processing this audio."
           : prev.error;
 
+      const estimatedTotalSec =
+        typeof backendJobStatus.estimated_total_sec === "number"
+          ? backendJobStatus.estimated_total_sec
+          : prev.estimatedTotalSec ?? null;
+
+      let remainingSec: number | null = prev.remainingSec ?? null;
+      if (typeof backendJobStatus.elapsed_sec === "number" && estimatedTotalSec) {
+        const rawRemaining = estimatedTotalSec - backendJobStatus.elapsed_sec;
+        remainingSec = Math.max(0, rawRemaining);
+      }
+
       return {
         ...prev,
         percentage:
@@ -756,6 +767,8 @@ export default function MixStudio() {
         currentStageId,
         completedStageIds,
         error: nextError,
+        estimatedTotalSec,
+        remainingSec,
       };
     });
   }, [backendJobStatus]);
