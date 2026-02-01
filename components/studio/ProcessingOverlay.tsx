@@ -83,6 +83,8 @@ export interface ProcessingOverlayState {
   completedStageIds: ProcessingStageId[];
   tracks: TrackProcessingStatus[];
   error?: string | null;
+  estimatedTotalSec?: number | null;
+  remainingSec?: number | null;
 }
 
 interface ProcessingOverlayProps {
@@ -313,6 +315,15 @@ export function ProcessingOverlay({ state, stages, onCancel, onDownload }: Proce
               value={percentage}
               label={currentStage ? currentStage.label : "Processing"}
             />
+
+            {typeof state.remainingSec === "number" && state.remainingSec > 0 && (
+              <p className="text-[11px] text-white/60">
+                Time remaining: ~
+                {Math.floor(state.remainingSec / 60)}
+                m {Math.max(0, Math.round(state.remainingSec % 60))}
+                s
+              </p>
+            )}
 
             <div className="mt-2 rounded-xl border border-white/10 bg-black/60 p-2 text-[11px] text-white/60">
               <p>
