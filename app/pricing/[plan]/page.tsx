@@ -197,6 +197,19 @@ export default function PlanCheckoutPage({ params }: PlanPageProps) {
   const effectiveAmountLabel = isPayAsYouGo && selectedOption ? selectedOption.amountLabel : plan.price;
   const effectiveLabel = isPayAsYouGo && selectedOption ? selectedOption.label : `${plan.name} plan`;
 
+  const selectedFeatureType: "audio_cleanup" | "mixing_only" | "mix_master" | "mastering_only" | undefined =
+    isPayAsYouGo && selectedOption
+      ? selectedOption.id === "audio-cleanup"
+        ? "audio_cleanup"
+        : selectedOption.id === "mix-only"
+          ? "mixing_only"
+          : selectedOption.id === "mix-master"
+            ? "mix_master"
+            : selectedOption.id === "master-only"
+              ? "mastering_only"
+              : undefined
+      : undefined;
+
   const openCheckout = (method: "paypal" | "card") => {
     setSelectedMethod(method);
     setStep(1);
@@ -471,6 +484,8 @@ export default function PlanCheckoutPage({ params }: PlanPageProps) {
                   <PlanPayPalButtons
                     planName={effectiveLabel}
                     amountLabel={effectiveAmountLabel}
+                    featureType={selectedFeatureType}
+                    quantity={isPayAsYouGo ? 1 : undefined}
                     onSuccess={closeModal}
                     onCancel={closeModal}
                   />
