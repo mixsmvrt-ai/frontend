@@ -1407,9 +1407,17 @@ export default function MixStudio() {
 
     const selectedPreset =
       availablePresets.find((p) => p.id === selectedPresetId) ?? availablePresets[0];
-    const presetName =
+    let presetName =
       selectedPreset?.dsp_chain_reference ||
       (trackType === "beat" || trackType === "master" ? "streaming_master" : "clean_vocal");
+
+    if (trackType === "vocal") {
+      if (track.role === "background") {
+        presetName = `${presetName}_bg`;
+      } else if (track.role === "adlib") {
+        presetName = `${presetName}_adlib`;
+      }
+    }
 
     formData.append("file", track.file);
     formData.append("track_type", trackType);
