@@ -268,12 +268,28 @@ function buildAIPluginsForTrack(
 
     switch (flavour) {
       case "trap_dh":
+        // Strongest subtractive curve.
+        subEqPreset = "eq_sub_trap_dh";
+        addEqPreset = "eq_air";
+        levelCompPreset = "comp_fast_tamer";
+        glueCompPreset = "comp_soft_glue";
+        deessPreset = "deess_bright";
+        satPreset = "sat_parallel_crunch";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_eighth_pingpong";
+        break;
       case "rap":
+        subEqPreset = "eq_sub_rap";
+        addEqPreset = "eq_air";
+        levelCompPreset = "comp_fast_tamer";
+        glueCompPreset = "comp_soft_glue";
+        deessPreset = "deess_bright";
+        satPreset = "sat_parallel_crunch";
+        reverbPreset = "rev_vocal_plate";
+        delayPreset = "del_eighth_pingpong";
+        break;
       case "hiphop":
-        // More aggressive modern vocals – use a warmer, slightly
-        // cutting curve for subtractive EQ and a brighter stage
-        // for additive EQ.
-        subEqPreset = "eq_warmth";
+        subEqPreset = "eq_sub_hiphop";
         addEqPreset = "eq_air";
         levelCompPreset = "comp_fast_tamer";
         glueCompPreset = "comp_soft_glue";
@@ -283,7 +299,7 @@ function buildAIPluginsForTrack(
         delayPreset = "del_eighth_pingpong";
         break;
       case "afrobeat":
-        subEqPreset = "eq_warmth";
+        subEqPreset = "eq_sub_afrobeat";
         addEqPreset = "eq_vocal_clarity";
         levelCompPreset = "comp_vocal_leveler";
         glueCompPreset = "comp_soft_glue";
@@ -293,7 +309,7 @@ function buildAIPluginsForTrack(
         delayPreset = "del_quarter_wide";
         break;
       case "rnb":
-        subEqPreset = "eq_warmth";
+        subEqPreset = "eq_sub_rnb";
         addEqPreset = "eq_air";
         levelCompPreset = "comp_vocal_leveler";
         glueCompPreset = "comp_soft_glue";
@@ -303,7 +319,7 @@ function buildAIPluginsForTrack(
         delayPreset = "del_quarter_wide";
         break;
       case "reggae":
-        subEqPreset = "eq_warmth";
+        subEqPreset = "eq_sub_reggae";
         addEqPreset = "eq_vocal_clarity";
         levelCompPreset = "comp_vocal_leveler";
         glueCompPreset = "comp_soft_glue";
@@ -313,7 +329,7 @@ function buildAIPluginsForTrack(
         delayPreset = "del_vocal_slap";
         break;
       case "dancehall":
-        subEqPreset = "eq_warmth";
+        subEqPreset = "eq_sub_trap_dh";
         addEqPreset = "eq_air";
         levelCompPreset = "comp_fast_tamer";
         glueCompPreset = "comp_soft_glue";
@@ -323,7 +339,7 @@ function buildAIPluginsForTrack(
         delayPreset = "del_vocal_slap";
         break;
       default:
-        subEqPreset = "eq_warmth";
+        subEqPreset = "eq_sub_generic";
         addEqPreset = "eq_vocal_clarity";
         levelCompPreset = "comp_vocal_leveler";
         glueCompPreset = "comp_soft_glue";
