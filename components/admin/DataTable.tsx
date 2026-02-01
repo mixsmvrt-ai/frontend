@@ -14,8 +14,15 @@ type DataTableProps<T> = {
 };
 
 export function DataTable<T extends { id?: string | number }>({ columns, data, emptyMessage }: DataTableProps<T>) {
+  const shouldScroll = data.length > 10;
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/70">
+    <div
+      className={
+        "overflow-hidden rounded-2xl border border-white/10 bg-black/70" +
+        (shouldScroll ? " max-h-96 overflow-y-auto" : "")
+      }
+    >
       <table className="min-w-full text-left text-xs text-zinc-300">
         <thead className="bg-white/5 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
           <tr>
