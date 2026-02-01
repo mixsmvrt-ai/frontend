@@ -1,10 +1,11 @@
 "use client";
 
 import type React from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PluginParams, TrackPlugin } from "../pluginTypes";
 import * as PluginTypes from "../pluginTypes";
 import Knob from "./primitives/Knob";
+import { isSupabaseConfigured, supabase } from "../../../lib/supabaseClient";
 
 type PluginShellProps = {
   plugin: TrackPlugin;
@@ -16,6 +17,13 @@ type PluginShellProps = {
   onHeaderPointerMove?: React.PointerEventHandler<HTMLDivElement>;
   onHeaderPointerUp?: React.PointerEventHandler<HTMLDivElement>;
   onHeaderPointerCancel?: React.PointerEventHandler<HTMLDivElement>;
+};
+
+type UserPluginPreset = {
+  id: string;
+  name: string;
+  plugin_type: string;
+  params: PluginParams;
 };
 
 function getNumber(params: PluginParams, key: string, fallback: number) {
@@ -45,6 +53,9 @@ export default function PluginShell({
   onHeaderPointerUp,
   onHeaderPointerCancel,
 }: PluginShellProps) {
+  const [userPresets, setUserPresets] = useState<UserPluginPreset[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
   const withAI = useMemo(
     () => (PluginTypes as any).ensurePluginHasAIParams?.(plugin) ?? plugin,
     [plugin],
@@ -65,12 +76,39 @@ export default function PluginShell({
   const hasAI = withAI.aiGenerated;
 
   const showAIBadge = hasAI;
+  const presetValue = userPresets.some((p) => p.id === withAI.preset)
+    ? (withAI.preset as string)
+    : "Current";
 
-  const presets = useMemo(
-    () => (PluginTypes as any).getPluginPresets?.(withAI.pluginType) ?? [],
-    [withAI.pluginType],
-  );
-  const presetValue = presets.some((p) => p.id === withAI.preset) ? (withAI.preset as string) : "Default";
+  // Load any existing user presets for this plugin type.
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPresets() {
+      if (!isSupabaseConfigured || !supabase) return;
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData?.user) return;
+
+        const { data, error } = await supabase
+          .from("user_plugin_presets")
+          .select("id,name,plugin_type,params")
+          .eq("plugin_type", withAI.pluginType)
+          .order("created_at", { ascending: true });
+
+        if (error || !isMounted || !Array.isArray(data)) return;
+        setUserPresets(data as UserPluginPreset[]);
+      } catch {
+        if (!isMounted) return;
+      }
+    }
+
+    void loadPresets();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [withAI.pluginType]);
 
   return (
     <div
@@ -116,33 +154,31 @@ export default function PluginShell({
               value={presetValue}
               onChange={(e) => {
                 const value = e.target.value;
-                if (value === "Default") {
-                  onChange({
-                    ...withAI,
-                    preset: "Default",
-                    params: {
-                      ...((PluginTypes as any).defaultPluginParams?.(withAI.pluginType) ?? {
-                        mix: 1,
-                        output_gain: 0,
-                      }),
-                      mix,
-                      output_gain: outputGain,
-                    },
-                    locked: false,
-                  });
+                if (value === "Current") {
+                  // Stay on the current settings; clear any preset id.
+                  onChange({ ...withAI, preset: undefined });
                   return;
                 }
-                const presetObj = presets.find((p) => p.id === value);
+
+                const presetObj = userPresets.find((p) => p.id === value);
                 if (!presetObj) return;
-                const applier = (PluginTypes as any).applyPluginPreset as
-                  | ((p: TrackPlugin, presetId: string) => TrackPlugin)
-                  | undefined;
-                onChange(applier ? applier(withAI, presetObj.id) : { ...withAI, preset: presetObj.id });
+
+                const nextParams = (presetObj.params as PluginParams) ?? {};
+
+                onChange({
+                  ...withAI,
+                  preset: presetObj.id,
+                  params: {
+                    ...nextParams,
+                  },
+                  aiGenerated: false,
+                  locked: false,
+                });
               }}
               aria-label="Preset"
             >
-              <option value="Default">Default</option>
-              {presets.map((p) => (
+              <option value="Current">Current settings</option>
+              {userPresets.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -239,6 +275,58 @@ export default function PluginShell({
               className="inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-black/40 px-4 text-[11px] text-white/70 hover:border-white/20 hover:bg-white/5"
             >
               Reset
+            </button>
+
+            <button
+              type="button"
+              data-no-drag
+              disabled={isSaving}
+              onClick={async () => {
+                if (!isSupabaseConfigured || !supabase) return;
+
+                try {
+                  setIsSaving(true);
+                  const { data: userData, error: userError } = await supabase.auth.getUser();
+                  if (userError || !userData?.user) {
+                    // eslint-disable-next-line no-alert
+                    window.alert("You need to be logged in to save presets.");
+                    setIsSaving(false);
+                    return;
+                  }
+
+                  const name = window.prompt("Save preset as", withAI.name || "New preset");
+                  if (!name || !name.trim()) {
+                    setIsSaving(false);
+                    return;
+                  }
+
+                  const payload = {
+                    user_id: userData.user.id,
+                    plugin_type: withAI.pluginType,
+                    name: name.trim(),
+                    params: withAI.params ?? {},
+                  };
+
+                  const { data, error } = await supabase
+                    .from("user_plugin_presets")
+                    .insert(payload)
+                    .select("id,name,plugin_type,params")
+                    .single();
+
+                  if (!error && data) {
+                    const preset = data as UserPluginPreset;
+                    setUserPresets((prev) => [...prev, preset]);
+                    onChange({ ...withAI, preset: preset.id });
+                  }
+                } catch {
+                  // Swallow errors; preset saving is non-critical.
+                } finally {
+                  setIsSaving(false);
+                }
+              }}
+              className="inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-black/40 px-4 text-[11px] text-white/70 hover:border-white/20 hover:bg-white/5 disabled:opacity-60"
+            >
+              {isSaving ? "Saving…" : "Save preset"}
             </button>
 
             <button
