@@ -185,6 +185,7 @@ function buildAIPluginsForTrack(
   genreKey?: string,
   role?: TrackType["role"],
   featureType?: FeatureType,
+  studioPresetId?: string | null,
 ): TrackPlugin[] {
   const ctx = `${presetName || ""} ${genreKey || ""}`.toLowerCase();
 
@@ -380,6 +381,56 @@ function buildAIPluginsForTrack(
       satPreset = "sat_parallel_crunch";
       reverbPreset = "rev_big_hall";
       delayPreset = "del_eighth_pingpong";
+    }
+
+    // Fine-tune vocal cleanup chains per Studio preset so that
+    // different audio_cleanup presets produce audibly distinct
+    // starting points in the TrackLane, even though they share
+    // the same underlying DSP entry point.
+    if (featureType === "audio_cleanup" && studioPresetId) {
+      const cleanupId = studioPresetId;
+
+      if (cleanupId === "low_end_rumble_removal") {
+        // Most aggressive low-end cleanup.
+        subEqPreset = "eq_sub_trap_dh";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_vocal_standard";
+        levelCompPreset = "comp_vocal_leveler";
+      } else if (
+        cleanupId === "harshness_reduction" || cleanupId === "de_ess_cleanup"
+      ) {
+        // Focus on upper-mid harshness and sibilance.
+        subEqPreset = "eq_sub_generic";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_bright";
+        levelCompPreset = "comp_vocal_leveler";
+      } else if (
+        cleanupId === "noisy_room_cleanup" ||
+        cleanupId === "room_echo_reduction" ||
+        cleanupId === "phone_recording_repair"
+      ) {
+        // Noisy / roomy sources: firmer levelling.
+        subEqPreset = "eq_sub_generic";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_vocal_standard";
+        levelCompPreset = "comp_fast_tamer";
+      } else if (
+        cleanupId === "dialogue_clarity_boost" ||
+        cleanupId === "voice_over_clean" ||
+        cleanupId === "podcast_clean"
+      ) {
+        // Forward, articulate spoken word.
+        subEqPreset = "eq_sub_generic";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_vocal_standard";
+        levelCompPreset = "comp_vocal_leveler";
+      } else if (cleanupId === "gentle_noise_reduction") {
+        // Subtle, minimal processing.
+        subEqPreset = "eq_sub_generic";
+        addEqPreset = "eq_vocal_clarity";
+        deessPreset = "deess_soft";
+        levelCompPreset = "comp_vocal_leveler";
+      }
     }
 
     if (featureType === "audio_cleanup") {
@@ -1650,6 +1701,7 @@ export default function MixStudio() {
       genreKey,
       track.role,
       currentFeatureType || undefined,
+      selectedPreset?.id ?? null,
     );
 
     return {
