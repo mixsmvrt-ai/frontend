@@ -285,7 +285,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
             low_freq: 95,
             low_gain: -3.0,
             low_q: 0.8,
-            low_type: "Shelf",
+            low_type: "HP",
 
             low_mid_freq: 280,
             low_mid_gain: -3.0,
@@ -317,7 +317,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
             low_freq: 95,
             low_gain: -2.0,
             low_q: 0.8,
-            low_type: "Shelf",
+            low_type: "HP",
 
             low_mid_freq: 320,
             low_mid_gain: -2.0,
@@ -349,7 +349,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
             low_freq: 95,
             low_gain: -2.5,
             low_q: 0.8,
-            low_type: "Shelf",
+            low_type: "HP",
 
             low_mid_freq: 320,
             low_mid_gain: -2.5,
@@ -381,7 +381,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
             low_freq: 95,
             low_gain: -1.5,
             low_q: 0.8,
-            low_type: "Shelf",
+            low_type: "HP",
 
             low_mid_freq: 260,
             low_mid_gain: -2.0,
@@ -413,7 +413,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
             low_freq: 95,
             low_gain: -0.5,
             low_q: 0.8,
-            low_type: "Shelf",
+            low_type: "HP",
 
             low_mid_freq: 260,
             low_mid_gain: -1.5,
@@ -445,7 +445,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
             low_freq: 95,
             low_gain: -0.5,
             low_q: 0.8,
-            low_type: "Shelf",
+            low_type: "HP",
 
             low_mid_freq: 260,
             low_mid_gain: -1.5,
@@ -477,7 +477,7 @@ export function getPluginPresets(type: PluginType): PluginPreset[] {
             low_freq: 95,
             low_gain: -1.5,
             low_q: 0.8,
-            low_type: "Shelf",
+            low_type: "HP",
 
             low_mid_freq: 320,
             low_mid_gain: -1.5,
