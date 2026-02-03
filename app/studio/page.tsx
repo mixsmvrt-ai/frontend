@@ -1029,9 +1029,6 @@ export default function MixStudio() {
   const [hasLoadedProjectLayout, setHasLoadedProjectLayout] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [saveDialogName, setSaveDialogName] = useState("");
-  const [macroAir, setMacroAir] = useState(0.5);
-  const [macroPunch, setMacroPunch] = useState(0.5);
-  const [macroWarmth, setMacroWarmth] = useState(0.5);
 
   useEffect(() => {
     let isMounted = true;
@@ -1952,11 +1949,6 @@ export default function MixStudio() {
     if (sessionScale) {
       formData.append("session_scale", sessionScale);
     }
-    // High-level macro controls that let the user steer Air,
-    // Punch and Warmth within each preset's safe DSP ranges.
-    formData.append("macro_air", String(macroAir));
-    formData.append("macro_punch", String(macroPunch));
-    formData.append("macro_warmth", String(macroWarmth));
     const response = await fetch(`${DSP_URL}/process`, {
       method: "POST",
       body: formData,
@@ -3459,57 +3451,6 @@ export default function MixStudio() {
                 throwFxMode={throwFxMode}
                 onThrowFxModeChange={setThrowFxMode}
               />
-            </div>
-
-            <div className="hidden min-w-[220px] max-w-xs space-y-1 text-[10px] text-white/60 sm:block">
-              <div className="flex items-center justify-between">
-                <span className="uppercase tracking-[0.16em] text-white/40">Tone macros</span>
-                <span className="text-white/40">Air / Punch / Warmth</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="flex items-center gap-2">
-                  <span className="w-14 text-right uppercase tracking-[0.16em] text-white/40">
-                    Air
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={macroAir}
-                    onChange={(event) => setMacroAir(parseFloat(event.target.value))}
-                    className="w-full cursor-pointer accent-red-500"
-                  />
-                </label>
-                <label className="flex items-center gap-2">
-                  <span className="w-14 text-right uppercase tracking-[0.16em] text-white/40">
-                    Punch
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={macroPunch}
-                    onChange={(event) => setMacroPunch(parseFloat(event.target.value))}
-                    className="w-full cursor-pointer accent-red-500"
-                  />
-                </label>
-                <label className="flex items-center gap-2">
-                  <span className="w-14 text-right uppercase tracking-[0.16em] text-white/40">
-                    Warmth
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={macroWarmth}
-                    onChange={(event) => setMacroWarmth(parseFloat(event.target.value))}
-                    className="w-full cursor-pointer accent-red-500"
-                  />
-                </label>
-              </div>
             </div>
 
             <div className="flex gap-2">
