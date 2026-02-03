@@ -16,6 +16,20 @@ export type StudioPresetMeta = {
   description: string;
   dsp_chain_reference: string;
   tags: string[];
+  // Extended metadata from the backend preset registry.
+  intent?: string | null;
+  inspired_style?: string | null;
+  target_genres?: string[];
+  flow?: "mix" | "mix_master" | "master";
+  category?: "vocal" | "full_mix" | "master";
+  dsp_ranges?: {
+    eq?: Record<string, unknown>;
+    compression?: Record<string, unknown>;
+    saturation?: Record<string, unknown>;
+    deesser?: Record<string, unknown>;
+    bus?: Record<string, unknown>;
+    limiter?: Record<string, unknown>;
+  };
 };
 
 interface PresetSelectorProps {
@@ -43,6 +57,17 @@ export function PresetSelector({
 
   const selected = presets.find((p) => p.id === selectedPresetId) ?? presets[0];
 
+   // Group presets by genre for easier navigation in the dropdown.
+  const groupedByGenre = presets.reduce<Record<string, StudioPresetMeta[]>>(
+    (acc, preset) => {
+      const key = (preset.genre || "general").toString();
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(preset);
+      return acc;
+    },
+    {},
+  );
+
   const warningText =
     hasBeatTrack && selected.target === "vocal"
       ? "Current preset is tuned for vocals. For stereo beats, try a Beat preset such as 'Minimal Beat Processing'."
@@ -62,20 +87,39 @@ export function PresetSelector({
           value={selected.id}
           onChange={(event) => onChange(event.target.value)}
         >
-          {presets.map((preset) => (
-            <option key={preset.id} value={preset.id} className="bg-black text-[11px]">
-              {preset.name}
-            </option>
+          {Object.entries(groupedByGenre).map(([genreKey, group]) => (
+            <optgroup
+              key={genreKey}
+              label={genreKey === "general" ? "All Genres" : genreKey}
+            >
+              {group.map((preset) => (
+                <option
+                  key={preset.id}
+                  value={preset.id}
+                  className="bg-black text-[11px]"
+                >
+                  {preset.name}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
         <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/60">
           ▾
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1 text-[10px] text-white/60">
-        <span className="truncate" title={selected.description}>
-          {selected.description}
+      <div className="flex flex-col gap-0.5 text-[10px] text-white/60">
+        <span
+          className="truncate"
+          title={selected.intent || selected.description}
+        >
+          {selected.intent || selected.description}
         </span>
+        {selected.inspired_style && (
+          <span className="truncate text-white/50">
+            Style: {selected.inspired_style}
+          </span>
+        )}
       </div>
       <div className="flex flex-wrap gap-1 text-[9px] text-white/60">
         {selected.tags.map((tag) => (
