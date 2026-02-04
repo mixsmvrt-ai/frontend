@@ -20,7 +20,6 @@ import {
   type StudioPresetMeta,
   type ThrowFxMode,
 } from "../../components/studio/PresetSelector";
-import MacroVisualizer from "../../components/studio/MacroVisualizer";
 import { useBackendJobStatus } from "../../lib/useBackendJobStatus";
 import type { TrackPlugin } from "../../components/studio/pluginTypes";
 import {
@@ -1030,7 +1029,6 @@ export default function MixStudio() {
   const [hasLoadedProjectLayout, setHasLoadedProjectLayout] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [saveDialogName, setSaveDialogName] = useState("");
-  const [macros, setMacros] = useState({ air: 0, punch: 0, warmth: 0 });
 
   useEffect(() => {
     let isMounted = true;
@@ -3453,14 +3451,6 @@ export default function MixStudio() {
                 throwFxMode={throwFxMode}
                 onThrowFxModeChange={setThrowFxMode}
               />
-              {(isMixOnlyMode || isMixMasterMode || isMasterOnlyMode) && (
-                <div className="mt-3">
-                  <MacroVisualizer
-                    macros={macros}
-                    onMacrosChange={setMacros}
-                  />
-                </div>
-              )}
             </div>
 
             <div className="flex gap-2">
