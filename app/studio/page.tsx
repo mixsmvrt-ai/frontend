@@ -2033,12 +2033,70 @@ export default function MixStudio() {
     const initialStageId = (flowStages[0] ?? PROCESSING_STAGES[0]).id;
 
     const playable = tracks.filter((track) => track.file);
-    const initialTrackStatuses: TrackProcessingStatus[] = playable.map((track) => ({
-      id: track.id,
-      name: track.name || track.id,
-      state: "idle",
-      percentage: 0,
-    }));
+
+    // Enforce a musically sensible processing order so that the engine
+    // always starts from the beat bed, then the main vocal, then
+    // supporting/background vocals, and finally adlibs and instruments.
+    const rolePriority: Record<TrackType["role"], number> = {
+      beat: 0,
+      vocal: 1,
+      background: 2,
+      adlib: 3,
+      instrument: 4,
+    };
+
+    const orderIndex = new Map<string, number>(
+      playable.map((t, index) => [t.id, index]),
+    );
+
+    const orderedPlayable = [...playable].sort((a, b) => {
+      const pa = rolePriority[a.role] ?? 99;
+      const pb = rolePriority[b.role] ?? 99;
+      if (pa !== pb) return pa - pb;
+      const ia = orderIndex.get(a.id) ?? 0;
+      const ib = orderIndex.get(b.id) ?? 0;
+      return ia - ib;
+    });
+
+    // Build human-friendly display names that make it obvious how many
+    // tracks of each role are being processed (e.g. "Background Vocal 1").
+    let beatCount = 0;
+    let mainVocalCount = 0;
+    let bgCount = 0;
+    let adlibCount = 0;
+    let instrumentCount = 0;
+
+    const initialTrackStatuses: TrackProcessingStatus[] = orderedPlayable.map((track) => {
+      let baseLabel = track.name || track.id;
+
+      if (track.role === "beat") {
+        beatCount += 1;
+        baseLabel = beatCount === 1 ? "Beat" : `Beat ${beatCount}`;
+      } else if (track.role === "vocal") {
+        mainVocalCount += 1;
+        baseLabel = mainVocalCount === 1 ? "Main Vocal" : `Main Vocal ${mainVocalCount}`;
+      } else if (track.role === "background") {
+        bgCount += 1;
+        baseLabel = `Background Vocal ${bgCount}`;
+      } else if (track.role === "adlib") {
+        adlibCount += 1;
+        baseLabel = `Adlib ${adlibCount}`;
+      } else if (track.role === "instrument") {
+        instrumentCount += 1;
+        baseLabel = instrumentCount === 1 ? "Instrument" : `Instrument ${instrumentCount}`;
+      }
+
+      const displayName = track.name && track.name !== baseLabel
+        ? `${baseLabel} – ${track.name}`
+        : baseLabel;
+
+      return {
+        id: track.id,
+        name: displayName,
+        state: "idle" as TrackProcessingStatus["state"],
+        percentage: 0,
+      };
+    });
 
     setProcessingOverlay({
       active: true,
@@ -2158,15 +2216,43 @@ export default function MixStudio() {
       const updates = new Map<string, ProcessedTrackResult>();
       let anyUpdated = false;
 
-      // Process each track that has audio through the AI DSP service
-      for (let index = 0; index < playable.length; index += 1) {
+      // Process each track that has audio through the AI DSP service,
+      // in the same role-based order used to seed the overlay.
+      const playableForLoop = (() => {
+        // Reconstruct the ordered list in case the closure-scope
+        // reference is lost; fall back to the raw playable list.
+        const rolePriority: Record<TrackType["role"], number> = {
+          beat: 0,
+          vocal: 1,
+          background: 2,
+          adlib: 3,
+          instrument: 4,
+        };
+
+        const orderIndex = new Map<string, number>(
+          playable.map((t, index) => [t.id, index]),
+        );
+
+        const ordered = [...playable].sort((a, b) => {
+          const pa = rolePriority[a.role] ?? 99;
+          const pb = rolePriority[b.role] ?? 99;
+          if (pa !== pb) return pa - pb;
+          const ia = orderIndex.get(a.id) ?? 0;
+          const ib = orderIndex.get(b.id) ?? 0;
+          return ia - ib;
+        });
+
+        return ordered;
+      })();
+
+      for (let index = 0; index < playableForLoop.length; index += 1) {
         if (processingCancelRef.current) {
           break;
         }
 
-        const track = playable[index];
+        const track = playableForLoop[index];
         // Show a small non-zero progress value while the first track is running
-        const baseProgress = (index / playable.length) * 100;
+        const baseProgress = (index / playableForLoop.length) * 100;
         const progressForTrack = Math.max(5, baseProgress);
 
         setProcessingOverlay((prev): ProcessingOverlayState | null => {
@@ -2204,7 +2290,7 @@ export default function MixStudio() {
           updates.set(track.id, processed);
           anyUpdated = true;
 
-          const completedPercent = ((index + 1) / playable.length) * 100;
+          const completedPercent = ((index + 1) / playableForLoop.length) * 100;
           setProcessingOverlay((prev): ProcessingOverlayState | null => {
             if (!prev) return prev;
             const updatedTracks: TrackProcessingStatus[] = prev.tracks.map((t) => {
@@ -2273,9 +2359,9 @@ export default function MixStudio() {
             };
           });
 
-          // For mix & master sessions, automatically rebalance background
-          // vocals and adlibs so they sit under and around the lead.
-          if (studioMode === "mix-master") {
+          // For mix & master and mix-only sessions, automatically rebalance
+          // background vocals and adlibs so they sit under and around the lead.
+          if (studioMode === "mix-master" || studioMode === "mix-only") {
             next = applyAutoMixBalanceForMixMaster(next);
           }
 
