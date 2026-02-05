@@ -203,6 +203,11 @@ export function ProcessingOverlay({ state, stages, queuePosition, queueSize, onC
   const stageList = stages && stages.length ? stages : PROCESSING_STAGES;
   const currentStage = stageList.find((s) => s.id === currentStageId);
 
+  const totalTracks = tracks.length;
+  const completedTracks = tracks.filter((t) => t.state === "completed").length;
+  const processingTracks = tracks.filter((t) => t.state === "processing").length;
+  const analyzedTracks = completedTracks + processingTracks;
+
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = React.useState<{ x: number; y: number }>({ x: 24, y: 80 });
   const dragRef = React.useRef<
@@ -352,7 +357,12 @@ export function ProcessingOverlay({ state, stages, queuePosition, queueSize, onC
 
             <div className="mt-1 space-y-1 rounded-xl border border-white/10 bg-black/70 p-2">
               <div className="flex items-center justify-between text-[11px] text-white/60">
-                <span>{mode === "mix" ? "Master Bus" : "Track status"}</span>
+                <span>{mode === "mix" ? "Track processing" : "Track status"}</span>
+                {totalTracks > 0 && (
+                  <span className="text-[10px] text-white/60">
+                    {analyzedTracks} / {totalTracks} tracks processed
+                  </span>
+                )}
                 {onCancel && (
                   <button
                     type="button"
