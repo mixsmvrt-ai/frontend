@@ -135,7 +135,12 @@ function applyAutoMixBalanceForMixMaster(tracks: TrackType[]): TrackType[] {
       volume = Math.min(1, volume * gainFromDb(0));
     } else if (track.role === "background") {
       const idx = bgIndexById.get(track.id) ?? 0;
-      pan = bgPanPattern[idx % bgPanPattern.length];
+      // If multiple background vocals are present, spread them wide
+      // left/right using the pan pattern. With only one background,
+      // leave its existing pan so the user can keep it centered if desired.
+      if (bgTracks.length > 1) {
+        pan = bgPanPattern[idx % bgPanPattern.length];
+      }
       // Push backgrounds a bit down so they support the lead.
       volume = Math.min(1, volume * gainFromDb(-6));
     } else if (track.role === "adlib") {
@@ -1666,6 +1671,22 @@ export default function MixStudio() {
   const handleTrackLevelChange = useCallback((trackId: string, level: number) => {
     setTrackLevels((prev) => ({ ...prev, [trackId]: level }));
   }, []);
+
+  const handleTrackRoleChange = useCallback(
+    (trackId: string, role: TrackType["role"]) => {
+      setTracks((prev) =>
+        prev.map((track) =>
+          track.id === trackId
+            ? {
+                ...track,
+                role,
+              }
+            : track,
+        ),
+      );
+    },
+    [],
+  );
 
   const handleTrackGenderChange = useCallback(
     (trackId: string, gender: "male" | "female") => {
@@ -3335,6 +3356,7 @@ export default function MixStudio() {
                   onPanChange={handlePanChange}
                   onLevelChange={handleTrackLevelChange}
                   onGenderChange={handleTrackGenderChange}
+                  onRoleChange={handleTrackRoleChange}
                   onToggleMute={handleToggleMute}
                   onToggleSolo={handleToggleSolo}
                   isAnySoloActive={isAnySoloActive}
