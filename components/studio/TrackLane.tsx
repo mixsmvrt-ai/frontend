@@ -1458,6 +1458,21 @@ export default function TrackLane({
               </div>
             </label>
           </div>
+
+          <div className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onProcess(track.id);
+              }}
+              className="h-7 rounded bg-red-600 px-2 text-[10px] font-semibold text-white shadow-[0_0_10px_rgba(248,113,113,0.7)] hover:bg-red-500 disabled:opacity-60"
+              disabled={!track.file}
+            >
+              Re-render
+            </button>
+            <span className="text-[9px] text-white/40">with plugin tweaks</span>
+          </div>
         </div>
 
         <div className="mt-2 flex items-center gap-2">
