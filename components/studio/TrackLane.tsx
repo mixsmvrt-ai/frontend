@@ -531,120 +531,141 @@ export default function TrackLane({
     ws.on("audioprocess", handleAudioProcess);
 
     const attachAnalyser = () => {
-      const wsAny: any = ws as any;
-      const mediaElement =
-        typeof wsAny.getMediaElement === "function" ? wsAny.getMediaElement() : null;
-
-      if (!mediaElement || typeof (mediaElement as any).getGainNode !== "function") {
-        return;
-      }
-
-      const gainNode: GainNode = (mediaElement as any).getGainNode();
-      const ac: AudioContext = (gainNode.context || (window as any).AudioContext) as AudioContext;
-
-      gainNodeRef.current = gainNode;
-      audioContextRef.current = ac;
-
-      // Ensure we have an analyser node; it will be inserted into the graph below.
-      let analyser: AnalyserNode | null = analyserRef.current;
-      if (!analyser) {
-        analyser = ac.createAnalyser();
-        analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.8;
-        analyserRef.current = analyser;
-      }
-
-      // (Re)build the WebAudio chain: gainNode -> [panner] -> plugins -> analyser -> destination.
       try {
-        gainNode.disconnect();
-      } catch {
-        // no-op
-      }
+        const wsAny: any = ws as any;
+        const mediaElement =
+          typeof wsAny.getMediaElement === "function" ? wsAny.getMediaElement() : null;
 
-      if (filterNodesRef.current.length) {
-        for (const node of filterNodesRef.current) {
+        if (!mediaElement || typeof (mediaElement as any).getGainNode !== "function") {
+          return;
+        }
+
+        const gainNode: GainNode = (mediaElement as any).getGainNode();
+        const ac: AudioContext = (gainNode.context || (window as any).AudioContext) as AudioContext;
+
+        gainNodeRef.current = gainNode;
+        audioContextRef.current = ac;
+
+        // Ensure we have an analyser node; it will be inserted into the graph below.
+        let analyser: AnalyserNode | null = analyserRef.current;
+        if (!analyser) {
+          analyser = ac.createAnalyser();
+          analyser.fftSize = 2048;
+          analyser.smoothingTimeConstant = 0.8;
+          analyserRef.current = analyser;
+        }
+
+        // (Re)build the WebAudio chain: gainNode -> [panner] -> plugins -> analyser -> destination.
+        try {
+          gainNode.disconnect();
+        } catch {
+          // no-op
+        }
+
+        if (filterNodesRef.current.length) {
+          for (const node of filterNodesRef.current) {
+            try {
+              node.disconnect();
+            } catch {
+              // ignore
+            }
+          }
+          filterNodesRef.current = [];
+        }
+
+        if (pluginFiltersCleanupRef.current) {
+          pluginFiltersCleanupRef.current();
+          pluginFiltersCleanupRef.current = null;
+        }
+
+        const filters: AudioNode[] = [];
+
+        // Panner node (track-level pan; region pan is applied per-frame in the audioprocess handler).
+        let panner = pannerRef.current;
+        if (typeof (ac as any).createStereoPanner === "function") {
+          if (!panner) {
+            panner = (ac as any).createStereoPanner();
+          }
+          if (panner) {
+            panner.pan.value = track.pan ?? 0;
+            pannerRef.current = panner;
+            filters.push(panner);
+          } else {
+            pannerRef.current = null;
+          }
+        } else {
+          pannerRef.current = null;
+        }
+
+        const built = buildWebAudioFiltersForPlugins(ac, plugins || []);
+        pluginFiltersCleanupRef.current = built.dispose;
+        filters.push(...built.filters);
+
+        if (analyser) {
+          filters.push(analyser);
+        }
+
+        if (!filters.length) {
+          // No filters configured; connect gain node directly to destination.
           try {
-            node.disconnect();
+            gainNode.connect(ac.destination);
+          } catch {
+            // ignore
+          }
+        } else {
+          let current: AudioNode = gainNode;
+          for (const node of filters) {
+            current.connect(node);
+            current = node;
+          }
+          try {
+            current.connect(ac.destination);
+          } catch {
+            // ignore
+          }
+          filterNodesRef.current = filters;
+        }
+
+        if (!analyser) return;
+
+        const buffer = new Uint8Array(analyser.frequencyBinCount || 2048);
+
+        const loop = () => {
+          if (!analyserRef.current) return;
+          analyserRef.current.getByteFrequencyData(buffer);
+          let sum = 0;
+          for (let i = 0; i < buffer.length; i += 1) {
+            sum += buffer[i] * buffer[i];
+          }
+          const rms = Math.sqrt(sum / buffer.length) / 255;
+          const clamped = Math.max(0, Math.min(1, rms));
+          setLevel(clamped);
+          onLevelChange(track.id, clamped);
+          meterRafRef.current = requestAnimationFrame(loop);
+        };
+
+        if (meterRafRef.current == null) {
+          meterRafRef.current = requestAnimationFrame(loop);
+        }
+      } catch (error) {
+        // If anything goes wrong while attaching the analyser or plugin graph,
+        // fall back to a simple direct connection so the track still plays.
+        // eslint-disable-next-line no-console
+        console.error("Error attaching analyser/filters for track", track.id, error);
+        const fallbackGain = gainNodeRef.current;
+        const ac = audioContextRef.current;
+        if (fallbackGain && ac) {
+          try {
+            fallbackGain.disconnect();
+          } catch {
+            // ignore
+          }
+          try {
+            fallbackGain.connect(ac.destination);
           } catch {
             // ignore
           }
         }
-        filterNodesRef.current = [];
-      }
-
-      if (pluginFiltersCleanupRef.current) {
-        pluginFiltersCleanupRef.current();
-        pluginFiltersCleanupRef.current = null;
-      }
-
-      const filters: AudioNode[] = [];
-
-      // Panner node (track-level pan; region pan is applied per-frame in the audioprocess handler).
-      let panner = pannerRef.current;
-      if (typeof (ac as any).createStereoPanner === "function") {
-        if (!panner) {
-          panner = (ac as any).createStereoPanner();
-        }
-        if (panner) {
-          panner.pan.value = track.pan ?? 0;
-          pannerRef.current = panner;
-          filters.push(panner);
-        } else {
-          pannerRef.current = null;
-        }
-      } else {
-        pannerRef.current = null;
-      }
-
-      const built = buildWebAudioFiltersForPlugins(ac, plugins || []);
-      pluginFiltersCleanupRef.current = built.dispose;
-      filters.push(...built.filters);
-
-      if (analyser) {
-        filters.push(analyser);
-      }
-
-      if (!filters.length) {
-        // No filters configured; connect gain node directly to destination.
-        try {
-          gainNode.connect(ac.destination);
-        } catch {
-          // ignore
-        }
-      } else {
-        let current: AudioNode = gainNode;
-        for (const node of filters) {
-          current.connect(node);
-          current = node;
-        }
-        try {
-          current.connect(ac.destination);
-        } catch {
-          // ignore
-        }
-        filterNodesRef.current = filters;
-      }
-
-      if (!analyser) return;
-
-      const buffer = new Uint8Array(analyser.frequencyBinCount || 2048);
-
-      const loop = () => {
-        if (!analyserRef.current) return;
-        analyserRef.current.getByteFrequencyData(buffer);
-        let sum = 0;
-        for (let i = 0; i < buffer.length; i += 1) {
-          sum += buffer[i] * buffer[i];
-        }
-        const rms = Math.sqrt(sum / buffer.length) / 255;
-        const clamped = Math.max(0, Math.min(1, rms));
-        setLevel(clamped);
-        onLevelChange(track.id, clamped);
-        meterRafRef.current = requestAnimationFrame(loop);
-      };
-
-      if (meterRafRef.current == null) {
-        meterRafRef.current = requestAnimationFrame(loop);
       }
     };
 
