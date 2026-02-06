@@ -51,6 +51,7 @@ type TrackLaneProps = {
   onVolumeChange: (trackId: string, volume: number) => void;
   onLevelChange: (trackId: string, level: number) => void;
   onGenderChange: (trackId: string, gender: "male" | "female") => void;
+  onRoleChange?: (trackId: string, role: TrackType["role"]) => void;
   onPanChange: (trackId: string, pan: number) => void;
   onToggleMute: (trackId: string) => void;
   onToggleSolo: (trackId: string) => void;
@@ -85,6 +86,7 @@ export default function TrackLane({
   onVolumeChange,
   onLevelChange,
   onGenderChange,
+  onRoleChange,
   onPanChange,
    onToggleMute,
    onToggleSolo,
@@ -144,6 +146,7 @@ export default function TrackLane({
     null,
   );
   const [showPlugins, setShowPlugins] = useState(true);
+  const [showRoleMenu, setShowRoleMenu] = useState(false);
 
   const toolDragRef = useRef<
     | null
@@ -1324,9 +1327,22 @@ export default function TrackLane({
             </button>
           )}
           <div className="flex items-center gap-1.5">
-            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase text-white/60">
-              {track.role}
-            </span>
+            <select
+              className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase text-white/80 outline-none"
+              value={track.role}
+              onChange={(event) => {
+                const nextRole = event.target.value as TrackType["role"];
+                if (onRoleChange) {
+                  onRoleChange(track.id, nextRole);
+                }
+              }}
+            >
+              <option value="beat">Beat</option>
+              <option value="vocal">Lead Vocal</option>
+              <option value="background">Background Vox</option>
+              <option value="adlib">Adlibs</option>
+              <option value="instrument">Instrument</option>
+            </select>
             {track.role !== "beat" && track.role !== "instrument" && (
               <select
                 className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-white/80 outline-none"
