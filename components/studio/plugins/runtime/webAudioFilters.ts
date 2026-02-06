@@ -274,7 +274,11 @@ export function buildWebAudioFiltersForPlugins(
   const filters: AudioNode[] = [];
 
   const sorted = [...(plugins || [])]
-    .filter((p) => p && p.enabled)
+    // Only apply user-added or explicitly non-AI plugins in the
+    // real-time WebAudio graph. AI-generated plugins represent what
+    // the offline DSP already baked into the rendered audio, so
+    // applying them again here would double-process the signal.
+    .filter((p) => p && p.enabled && !p.aiGenerated)
     .sort((a, b) => a.order - b.order);
 
   for (const plugin of sorted) {
