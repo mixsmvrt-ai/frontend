@@ -155,10 +155,15 @@ class AudioTransportImpl {
 
     let panNode: StereoPannerNode | null = null;
     if (typeof (ctx as any).createStereoPanner === "function") {
-      panNode = (ctx as any).createStereoPanner();
-      panNode.pan.value = 0;
-      gainNode.connect(panNode);
-      panNode.connect(this.masterGain);
+      const created = (ctx as any).createStereoPanner() as StereoPannerNode | null;
+      if (created) {
+        created.pan.value = 0;
+        gainNode.connect(created);
+        created.connect(this.masterGain);
+        panNode = created;
+      } else {
+        gainNode.connect(this.masterGain);
+      }
     } else {
       gainNode.connect(this.masterGain);
     }
