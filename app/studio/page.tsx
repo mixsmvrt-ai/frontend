@@ -703,6 +703,37 @@ function buildAIPluginsForTrack(
       }
     }
 
+    // In mix+master flows, also let the full-mix Studio preset
+    // shape the beat EQ flavour so different presets do not all
+    // show the same "AI Beat EQ" settings.
+    if (studioPresetId && featureType === "mix_master") {
+      const busPresetId = studioPresetId;
+
+      if (
+        busPresetId === "radio_ready_mix" ||
+        busPresetId === "clean_commercial_mix" ||
+        busPresetId === "streaming_optimized_mix" ||
+        busPresetId === "wide_stereo_mix" ||
+        busPresetId === "vocal_forward_mix"
+      ) {
+        // More neutral/bright overall tonal balance.
+        addMeqPreset = "meq_bright";
+      } else if (
+        busPresetId === "warm_analog_mix" ||
+        busPresetId === "bass_heavy_mix"
+      ) {
+        // Warmer, thicker mixes keep the beat EQ on the warm side.
+        addMeqPreset = "meq_warm";
+      } else if (
+        busPresetId === "club_ready_mix" ||
+        busPresetId === "loud_modern_mix" ||
+        busPresetId === "punchy_urban_mix"
+      ) {
+        // Club / loud / punchy presets favour a brighter beat EQ.
+        addMeqPreset = "meq_bright";
+      }
+    }
+
     // For mix-only and mix+master Studio flows, keep beat
     // processing light: just open the beat a little with EQ
     // instead of showing a full mastering-style bus chain.
