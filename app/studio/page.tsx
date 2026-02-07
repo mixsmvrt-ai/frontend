@@ -3322,11 +3322,11 @@ function MixStudioInner() {
       <div className="flex flex-1 min-h-0 bg-black pb-28 sm:pb-0">
         <div className="flex-1 overflow-y-auto overflow-x-auto">
           <div className="relative min-w-[900px]">
-            {/* Global playhead line spanning timeline + tracks */}
-            <div className="pointer-events-none absolute inset-y-0 left-0 right-0">
+            {/* Global playhead line spanning timeline + waveform grid (excluding track header/faders) */}
+            <div className="pointer-events-none absolute inset-y-0 left-60 right-0">
               <div
                 className="absolute top-0 bottom-0 border-l border-red-400/90 shadow-[0_0_12px_rgba(248,113,113,0.7)]"
-                style={{ left: `${60 + playheadX}px` }}
+                style={{ left: `${playheadX}px` }}
               />
             </div>
             <Timeline
