@@ -229,6 +229,14 @@ class AudioTransportImpl {
     if (this.isPlaying) return;
     if (!this.masterGain) return;
 
+    // Ensure the AudioContext is running; many browsers start it in a
+    // "suspended" state until a user gesture calls resume().
+    if (typeof ctx.resume === "function" && ctx.state === "suspended") {
+      void ctx.resume().catch(() => {
+        // ignore resume errors; playhead will remain silent if context can't resume
+      });
+    }
+
     this.isPlaying = true;
     // Compute starting point based on current playhead
     const base = this.playheadSec;
