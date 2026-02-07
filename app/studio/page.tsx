@@ -7,6 +7,7 @@ import { isSupabaseConfigured, supabase } from "../../lib/supabaseClient";
 import TransportBar from "../../components/studio/TransportBar";
 import TrackLane from "../../components/studio/TrackLane";
 import Timeline from "../../components/studio/Timeline";
+import { AudioTransportProvider, useAudioTransport } from "../../audio-engine/AudioTransportContext";
 import {
   ProcessingOverlay,
   type ProcessingOverlayState,
@@ -42,6 +43,14 @@ import {
 import { encodeWavFromAudioBuffer } from "../../components/studio/tools/wav";
 
 export const dynamic = "force-dynamic";
+
+export default function MixStudio() {
+  return (
+    <AudioTransportProvider>
+      <MixStudioInner />
+    </AudioTransportProvider>
+  );
+}
 
 export type TrackType = {
   id: string;
@@ -1007,7 +1016,7 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
   }
 }
 
-export default function MixStudio() {
+function MixStudioInner() {
   const router = useRouter();
   const [authChecking, setAuthChecking] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -1151,7 +1160,7 @@ export default function MixStudio() {
   const [tracks, setTracks] = useState<TrackType[]>(() =>
     getInitialTracksForMode("default"),
   );
-  const [isPlaying, setIsPlaying] = useState(false);
+  const { isPlaying, currentTime, play, pause, seek } = useAudioTransport();
   const [zoom, setZoom] = useState(1.2);
   const [masterVolume, setMasterVolume] = useState(0.9);
   const [trackLevels, setTrackLevels] = useState<Record<string, number>>({});
@@ -1443,17 +1452,21 @@ export default function MixStudio() {
     setHasMixed(false);
   }, [studioMode, hasLoadedProjectLayout]);
 
-  // Spacebar play/pause
+  // Spacebar play/pause controlling global transport
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.code === "Space") {
         e.preventDefault();
-        setIsPlaying((p) => !p);
+        if (isPlaying) {
+          pause();
+        } else {
+          play();
+        }
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, []);
+  }, [isPlaying, play, pause]);
 
   // Load presets whenever the studio mode or genre/track context changes
   useEffect(() => {
@@ -1556,37 +1569,10 @@ export default function MixStudio() {
     return () => window.removeEventListener("wheel", handleWheel);
   }, []);
 
-  // Simple transport clock based on play/pause state
+  // Sync local playheadSeconds to global transport time
   useEffect(() => {
-    if (!isPlaying) {
-      if (rafRef.current != null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      lastTimeRef.current = null;
-      return;
-    }
-
-    const loop = (time: number) => {
-      if (lastTimeRef.current == null) {
-        lastTimeRef.current = time;
-      }
-      const delta = (time - lastTimeRef.current) / 1000;
-      lastTimeRef.current = time;
-      setPlayheadSeconds((prev) => prev + delta);
-      rafRef.current = requestAnimationFrame(loop);
-    };
-
-    rafRef.current = requestAnimationFrame(loop);
-
-    return () => {
-      if (rafRef.current != null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      lastTimeRef.current = null;
-    };
-  }, [isPlaying]);
+    setPlayheadSeconds(currentTime);
+  }, [currentTime]);
 
   const handleFileSelected = useCallback((trackId: string, file: File) => {
     setTracks((prev) =>
@@ -1814,20 +1800,20 @@ export default function MixStudio() {
   }, []);
 
   const handleStop = () => {
-    setIsPlaying(false);
-    setPlayheadSeconds(0);
+    pause();
+    seek(0);
   };
 
   const handlePrev = () => {
-    setIsPlaying(false);
-    setPlayheadSeconds(0);
+    pause();
+    seek(0);
     window.dispatchEvent(new Event("mixsmvrt:transport-prev"));
   };
 
   const handleNext = () => {
-    setIsPlaying(false);
+    pause();
     if (projectDuration > 0) {
-      setPlayheadSeconds(projectDuration);
+      seek(projectDuration);
     }
     window.dispatchEvent(new Event("mixsmvrt:transport-next"));
   };
@@ -1969,6 +1955,25 @@ export default function MixStudio() {
     }
     if (sessionScale) {
       formData.append("session_scale", sessionScale);
+    }
+
+    // Thread the current plugin chain through to the DSP engine so
+    // offline renders can eventually honour the user's knob tweaks
+    // instead of relying solely on the high-level preset name.
+    if (Array.isArray(track.plugins) && track.plugins.length > 0) {
+      const pluginChain = track.plugins.map((p) => ({
+        pluginType: p.pluginType,
+        params: p.params,
+        enabled: p.enabled,
+        order: p.order,
+        aiGenerated: p.aiGenerated,
+      }));
+      try {
+        formData.append("plugin_chain", JSON.stringify(pluginChain));
+      } catch {
+        // If serialization fails, skip sending plugin_chain rather than
+        // breaking the processing request.
+      }
     }
     const response = await fetch(`${DSP_URL}/process`, {
       method: "POST",
@@ -2426,7 +2431,7 @@ export default function MixStudio() {
   const handlePreviewMix = () => {
     if (!tracks.some((track) => track.file)) return;
     handlePrev();
-    setIsPlaying(true);
+    play();
   };
 
   const handleSendToMaster = async () => {
@@ -3282,7 +3287,13 @@ export default function MixStudio() {
 
       <TransportBar
         isPlaying={isPlaying}
-        onPlayToggle={() => setIsPlaying((p) => !p)}
+        onPlayToggle={() => {
+          if (isPlaying) {
+            pause();
+          } else {
+            play();
+          }
+        }}
         onStop={handleStop}
         onPrev={handlePrev}
         onNext={handleNext}
@@ -3439,7 +3450,13 @@ export default function MixStudio() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsPlaying((p) => !p)}
+              onClick={() => {
+                if (isPlaying) {
+                  pause();
+                } else {
+                  play();
+                }
+              }}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[13px] font-semibold text-black"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
