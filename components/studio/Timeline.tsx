@@ -1,5 +1,3 @@
-import { barSeconds } from "./tools/studioTools";
-
 type GridResolution = "1/2" | "1/4" | "1/8";
 
 export default function Timeline({
@@ -24,9 +22,9 @@ export default function Timeline({
   const stepWidth = baseBarWidth * zoom * resolutionFactor[gridResolution];
 
   // Map global playhead time (seconds) to an X position in the timeline.
-  const barDurationSec = barSeconds(bpm);
-  const pixelsPerSecond =
-    barDurationSec > 0 ? (baseBarWidth * zoom) / barDurationSec : 0;
+  // Use the same pixels-per-second as WaveSurfer (minPxPerSec = 60 * zoom)
+  // so the red playhead line stays locked to the actual audio timing.
+  const pixelsPerSecond = 60 * zoom;
   const playheadX = Math.max(0, playheadSeconds * pixelsPerSecond);
 
   return (
