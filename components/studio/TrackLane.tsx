@@ -151,8 +151,6 @@ export default function TrackLane({
   const [showPlugins, setShowPlugins] = useState(true);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
 
-  const transportHandleRef = useRef<ReturnType<typeof registerTrack> | null>(null);
-
   const toolDragRef = useRef<
     | null
     | {
