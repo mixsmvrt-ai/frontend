@@ -104,7 +104,8 @@ export default function TrackLane({
   onDuplicate,
   onProcess,
 }: TrackLaneProps) {
-  const { currentTime, registerTrack, decodeFile } = useAudioTransport();
+  const { isPlaying: transportPlaying, currentTime, registerTrack, decodeFile } =
+    useAudioTransport();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const regionsPluginRef = useRef<RegionsPlugin | null>(null);
@@ -1140,7 +1141,7 @@ export default function TrackLane({
     }
   }, [zoom]);
 
-  // WaveSurfer is now visual-only: sync its cursor to global transport time
+  // Sync WaveSurfer cursor to global transport time while transport is paused
   useEffect(() => {
     const ws = wavesurferRef.current;
     if (!ws) return;
@@ -1148,12 +1149,37 @@ export default function TrackLane({
     if (duration <= 0) return;
     const clamped = Math.max(0, Math.min(duration, currentTime));
     try {
-      // WaveSurfer v7 has seekTo(0-1); we use it here based on seconds.
-      ws.seekTo(clamped / duration);
+      if (!transportPlaying) {
+        // WaveSurfer v7 has seekTo(0-1); we use it here based on seconds.
+        ws.seekTo(clamped / duration);
+      }
     } catch {
       // ignore visual sync errors
     }
-  }, [currentTime, trackDuration]);
+  }, [currentTime, trackDuration, transportPlaying]);
+
+  // Drive WaveSurfer audio playback from the global transport state so that
+  // all tracks start/stop together.
+  useEffect(() => {
+    const ws = wavesurferRef.current;
+    if (!ws || !track.file) return;
+
+    try {
+      if (transportPlaying) {
+        const duration = trackDuration || ws.getDuration() || 0;
+        if (duration > 0) {
+          const clamped = Math.max(0, Math.min(duration, currentTime));
+          ws.play(clamped);
+        } else {
+          ws.play();
+        }
+      } else {
+        ws.pause();
+      }
+    } catch {
+      // ignore play/pause failures (e.g. if backend is not ready yet)
+    }
+  }, [transportPlaying]);
 
   // React to volume changes (track or master)
   useEffect(() => {
