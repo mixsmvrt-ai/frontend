@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
 import type { TrackType } from "../../app/studio/page";
+import { useAudioTransport } from "../../audio-engine/AudioTransportContext";
 import type { TrackPlugin } from "./pluginTypes";
 import TrackPluginRack from "./TrackPluginRack";
 import { buildWebAudioFiltersForPlugins } from "./plugins/runtime/webAudioFilters";
@@ -103,6 +104,7 @@ export default function TrackLane({
   onDuplicate,
   onProcess,
 }: TrackLaneProps) {
+  const { currentTime, registerTrack, decodeFile } = useAudioTransport();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const regionsPluginRef = useRef<RegionsPlugin | null>(null);
@@ -123,6 +125,7 @@ export default function TrackLane({
   const pluginFiltersCleanupRef = useRef<null | (() => void)>(null);
   const pluginApplyRafRef = useRef<number | null>(null);
   const meterRafRef = useRef<number | null>(null);
+  const transportHandleRef = useRef<ReturnType<typeof registerTrack> | null>(null);
   const baseVolumeRef = useRef(track.volume);
   const masterVolumeRef = useRef(masterVolume);
     const audibleRef = useRef(true);
@@ -147,6 +150,8 @@ export default function TrackLane({
   );
   const [showPlugins, setShowPlugins] = useState(true);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+
+  const transportHandleRef = useRef<ReturnType<typeof registerTrack> | null>(null);
 
   const toolDragRef = useRef<
     | null
@@ -205,6 +210,48 @@ export default function TrackLane({
   useEffect(() => {
     activeToolRef.current = activeTool;
   }, [activeTool]);
+
+  // Register this track with the global AudioTransport
+  useEffect(() => {
+    const handle = registerTrack(track.id, 0);
+    transportHandleRef.current = handle;
+    return () => {
+      handle.dispose();
+      if (transportHandleRef.current === handle) {
+        transportHandleRef.current = null;
+      }
+    };
+  }, [registerTrack, track.id]);
+
+  // Decode the track's File into an AudioBuffer for the transport whenever it changes
+  useEffect(() => {
+    if (!track.file) {
+      if (transportHandleRef.current) {
+        transportHandleRef.current.setBuffer(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const buffer = await decodeFile(track.file as File);
+        if (!cancelled && transportHandleRef.current) {
+          transportHandleRef.current.setBuffer(buffer);
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to decode audio file for track", track.id, error);
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [decodeFile, track.file, track.id]);
 
   useEffect(() => {
     bpmRef.current = bpm;
@@ -328,12 +375,17 @@ export default function TrackLane({
     const isAudible = !muted && (!anySolo || solo);
     audibleRef.current = isAudible;
 
+    const baseVolume = Math.max(
+      0,
+      Math.min(1, baseVolumeRef.current * masterVolumeRef.current),
+    );
+
     if (wavesurferRef.current) {
-      const baseVolume = Math.max(
-        0,
-        Math.min(1, baseVolumeRef.current * masterVolumeRef.current),
-      );
       wavesurferRef.current.setVolume(isAudible ? baseVolume : 0);
+    }
+
+    if (transportHandleRef.current) {
+      transportHandleRef.current.setGain(isAudible ? baseVolume : 0);
     }
   }, [track.muted, track.solo, isAnySoloActive]);
 
@@ -679,7 +731,7 @@ export default function TrackLane({
         }),
       );
       // Paint existing regions after decode/ready.
-        syncRegionsToPlugin(regionsRef.current);
+      syncRegionsToPlugin(regionsRef.current);
       setPluginRegionInteractivity();
     });
 
@@ -1090,15 +1142,20 @@ export default function TrackLane({
     }
   }, [zoom]);
 
-  // React to global transport state
+  // WaveSurfer is now visual-only: sync its cursor to global transport time
   useEffect(() => {
-    if (!wavesurferRef.current) return;
-    if (isPlaying) {
-      wavesurferRef.current.play();
-    } else {
-      wavesurferRef.current.pause();
+    const ws = wavesurferRef.current;
+    if (!ws) return;
+    const duration = trackDuration || ws.getDuration() || 0;
+    if (duration <= 0) return;
+    const clamped = Math.max(0, Math.min(duration, currentTime));
+    try {
+      // WaveSurfer v7 has seekTo(0-1); we use it here based on seconds.
+      ws.seekTo(clamped / duration);
+    } catch {
+      // ignore visual sync errors
     }
-  }, [isPlaying]);
+  }, [currentTime, trackDuration]);
 
   // React to volume changes (track or master)
   useEffect(() => {
@@ -1110,6 +1167,14 @@ export default function TrackLane({
       const audibleVolume = audibleRef.current ? baseVolume : 0;
       wavesurferRef.current.setVolume(audibleVolume);
     }
+    if (transportHandleRef.current) {
+      const baseVolume = Math.max(
+        0,
+        Math.min(1, track.volume * masterVolume),
+      );
+      const audibleVolume = audibleRef.current ? baseVolume : 0;
+      transportHandleRef.current.setGain(audibleVolume);
+    }
   }, [track.volume, masterVolume]);
 
   // React to pan changes
@@ -1117,6 +1182,10 @@ export default function TrackLane({
     if (pannerRef.current) {
       const next = Math.max(-1, Math.min(1, track.pan ?? 0));
       pannerRef.current.pan.value = next;
+    }
+    if (transportHandleRef.current) {
+      const next = Math.max(-1, Math.min(1, track.pan ?? 0));
+      transportHandleRef.current.setPan(next);
     }
   }, [track.pan]);
 
