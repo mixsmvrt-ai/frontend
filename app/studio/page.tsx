@@ -703,6 +703,16 @@ function buildAIPluginsForTrack(
       }
     }
 
+    // For mix-only and mix+master Studio flows, keep beat
+    // processing light: just open the beat a little with EQ
+    // instead of showing a full mastering-style bus chain.
+    if (featureType === "mixing_only" || featureType === "mix_master") {
+      plugins.push(
+        createPlugin("Mastering EQ", addMeqPreset, "AI Beat EQ", 0),
+      );
+      return plugins;
+    }
+
     plugins.push(
       createPlugin("Mastering EQ", subMeqPreset, "AI Subtractive EQ", 0),
       createPlugin("Master Bus Compressor", busTightPreset, "AI Tight Bus Comp", 1),
