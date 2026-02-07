@@ -1,14 +1,18 @@
+import { barSeconds } from "./tools/studioTools";
+
 type GridResolution = "1/2" | "1/4" | "1/8";
 
 export default function Timeline({
   zoom,
   gridResolution,
   bpm,
+  playheadSeconds,
   onZoomChange,
 }: {
   zoom: number;
   gridResolution: GridResolution;
   bpm: number;
+  playheadSeconds: number;
   onZoomChange: (value: number) => void;
 }) {
   const baseBarWidth = 80;
@@ -19,6 +23,12 @@ export default function Timeline({
   };
   const stepWidth = baseBarWidth * zoom * resolutionFactor[gridResolution];
 
+  // Map global playhead time (seconds) to an X position in the timeline.
+  const barDurationSec = barSeconds(bpm);
+  const pixelsPerSecond =
+    barDurationSec > 0 ? (baseBarWidth * zoom) / barDurationSec : 0;
+  const playheadX = Math.max(0, playheadSeconds * pixelsPerSecond);
+
   return (
     <div className="flex h-10 items-stretch border-b border-white/10 bg-zinc-950/90 text-xs text-white/40">
       {/* Spacer aligned with track header width */}
@@ -26,6 +36,14 @@ export default function Timeline({
 
       {/* Bar grid + labels above audio area */}
       <div className="relative flex-1 overflow-hidden">
+        {/* Global playhead line */}
+        <div className="pointer-events-none absolute inset-0">
+          <div
+            className="absolute top-0 bottom-0 border-l border-red-400/90 shadow-[0_0_12px_rgba(248,113,113,0.7)]"
+            style={{ left: `${playheadX}px` }}
+          />
+        </div>
+
         <div
           className="pointer-events-none absolute inset-0 opacity-40"
           style={{
