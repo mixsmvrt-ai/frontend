@@ -126,75 +126,40 @@ class AudioTransportImpl {
   }
 
   registerTrack(config: TransportTrackConfig): TransportTrackHandle {
-    const ctx = this.ensureContext();
-    if (!this.masterGain) {
-      throw new Error("Master gain not initialized");
+    // For now the transport is responsible for timing only; audio output is
+    // handled by the per-track WaveSurfer instances. We still return a handle
+    // so callers can keep their code simple, but the handle is effectively a
+    // no-op placeholder.
+    const id = config.id;
+    if (!this.tracks.has(id)) {
+      this.tracks.set(id, {
+        id,
+        offsetSec: config.offsetSec ?? 0,
+        buffer: null,
+        // Dummy nodes that are never connected; kept only to satisfy the
+        // internal Track record shape.
+        gainNode: (this.ensureContext().createGain()),
+        panNode: null,
+        currentSource: null,
+        gain: 1,
+        pan: 0,
+      });
     }
 
-    const existing = this.tracks.get(config.id);
-    if (existing) {
-      return {
-        id: existing.id,
-        setBuffer: (buffer) => {
-          existing.buffer = buffer;
-        },
-        setGain: (gain) => {
-          existing.gain = gain;
-          existing.gainNode.gain.value = gain;
-        },
-        setPan: (pan) => {
-          existing.pan = pan;
-          if (existing.panNode) existing.panNode.pan.value = pan;
-        },
-        dispose: () => this.unregisterTrack(config.id),
-      };
-    }
-
-    const gainNode = ctx.createGain();
-    gainNode.gain.value = 1;
-
-    let panNode: StereoPannerNode | null = null;
-    if (typeof (ctx as any).createStereoPanner === "function") {
-      const created = (ctx as any).createStereoPanner() as StereoPannerNode | null;
-      if (created) {
-        created.pan.value = 0;
-        gainNode.connect(created);
-        created.connect(this.masterGain);
-        panNode = created;
-      } else {
-        gainNode.connect(this.masterGain);
-      }
-    } else {
-      gainNode.connect(this.masterGain);
-    }
-
-    const track = {
-      id: config.id,
-      offsetSec: config.offsetSec ?? 0,
-      buffer: null as AudioBuffer | null,
-      gainNode,
-      panNode,
-      currentSource: null as AudioBufferSourceNode | null,
-      gain: 1,
-      pan: 0,
-    };
-
-    this.tracks.set(config.id, track);
+    const existing = this.tracks.get(id)!;
 
     return {
-      id: config.id,
+      id,
       setBuffer: (buffer) => {
-        track.buffer = buffer;
+        existing.buffer = buffer;
       },
       setGain: (gain) => {
-        track.gain = gain;
-        track.gainNode.gain.value = gain;
+        existing.gain = gain;
       },
       setPan: (pan) => {
-        track.pan = pan;
-        if (track.panNode) track.panNode.pan.value = pan;
+        existing.pan = pan;
       },
-      dispose: () => this.unregisterTrack(config.id),
+      dispose: () => this.unregisterTrack(id),
     };
   }
 
@@ -225,35 +190,20 @@ class AudioTransportImpl {
   }
 
   play() {
-    const ctx = this.ensureContext();
     if (this.isPlaying) return;
-    if (!this.masterGain) return;
+    this.isPlaying = true;
+    const ctx = this.ensureContext();
 
-    // Ensure the AudioContext is running; many browsers start it in a
-    // "suspended" state until a user gesture calls resume().
+    // Ensure the AudioContext is running so we have a monotonic clock for
+    // timing, even though audio is produced elsewhere.
     if (typeof ctx.resume === "function" && ctx.state === "suspended") {
       void ctx.resume().catch(() => {
-        // ignore resume errors; playhead will remain silent if context can't resume
+        // ignore resume errors; timing will still advance using playheadSec
       });
     }
 
-    this.isPlaying = true;
-    // Compute starting point based on current playhead
-    const base = this.playheadSec;
+    // Starting point based on current playhead
     this.lastStartContextTime = ctx.currentTime;
-
-    this.tracks.forEach((track) => {
-      if (!track.buffer) return;
-      const source = ctx.createBufferSource();
-      source.buffer = track.buffer;
-      const when = ctx.currentTime;
-      const offset = Math.max(0, base - track.offsetSec);
-      const duration = track.buffer.duration - offset;
-      if (duration <= 0) return;
-      source.connect(track.gainNode);
-      source.start(when, offset);
-      track.currentSource = source;
-    });
 
     this.startRafLoop();
     this.emit();
@@ -271,17 +221,6 @@ class AudioTransportImpl {
     const elapsed = ctx.currentTime - this.lastStartContextTime;
     this.playheadSec += Math.max(0, elapsed);
 
-    this.tracks.forEach((track) => {
-      if (!track.currentSource) return;
-      try {
-        track.currentSource.stop();
-        track.currentSource.disconnect();
-      } catch {
-        // ignore
-      }
-      track.currentSource = null;
-    });
-
     this.isPlaying = false;
     this.lastStartContextTime = null;
     this.stopRafLoop();
@@ -296,36 +235,9 @@ class AudioTransportImpl {
       this.emit();
       return;
     }
-
-    // If we are currently playing, restart all sources from the new time.
-    this.tracks.forEach((track) => {
-      if (track.currentSource) {
-        try {
-          track.currentSource.stop();
-          track.currentSource.disconnect();
-        } catch {
-          // ignore
-        }
-        track.currentSource = null;
-      }
-    });
-
-    if (!this.audioContext) return;
-    const ctx = this.audioContext;
-    this.lastStartContextTime = ctx.currentTime;
-
-    this.tracks.forEach((track) => {
-      if (!track.buffer) return;
-      const source = ctx.createBufferSource();
-      source.buffer = track.buffer;
-      const when = ctx.currentTime;
-      const offset = Math.max(0, clamped - track.offsetSec);
-      const duration = track.buffer.duration - offset;
-      if (duration <= 0) return;
-      source.connect(track.gainNode);
-      source.start(when, offset);
-      track.currentSource = source;
-    });
+    if (this.audioContext) {
+      this.lastStartContextTime = this.audioContext.currentTime;
+    }
 
     this.emit();
   }
