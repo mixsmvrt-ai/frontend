@@ -3322,6 +3322,7 @@ function MixStudioInner() {
               zoom={zoom}
               gridResolution={gridResolution}
               bpm={bpm}
+              playheadSeconds={playheadSeconds}
               onZoomChange={(value) =>
                 setZoom((prev) => {
                   const clamped = Math.min(6, Math.max(0.5, value));
