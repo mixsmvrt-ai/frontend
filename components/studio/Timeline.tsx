@@ -6,13 +6,13 @@ export default function Timeline({
   zoom,
   gridResolution,
   bpm,
-  playheadSeconds,
+  playheadSeconds = 0,
   onZoomChange,
 }: {
   zoom: number;
   gridResolution: GridResolution;
   bpm: number;
-  playheadSeconds: number;
+  playheadSeconds?: number;
   onZoomChange: (value: number) => void;
 }) {
   const baseBarWidth = 80;
