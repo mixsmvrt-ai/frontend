@@ -7,6 +7,7 @@ import { isSupabaseConfigured, supabase } from "../../lib/supabaseClient";
 import TransportBar from "../../components/studio/TransportBar";
 import TrackLane from "../../components/studio/TrackLane";
 import Timeline from "../../components/studio/Timeline";
+import TrackPluginRack from "../../components/studio/TrackPluginRack";
 import { AudioTransportProvider, useAudioTransport } from "../../audio-engine/AudioTransportContext";
 import {
   ProcessingOverlay,
@@ -1204,6 +1205,7 @@ function MixStudioInner() {
   const { isPlaying, currentTime, play, pause, seek } = useAudioTransport();
   const [zoom, setZoom] = useState(1.2);
   const [masterVolume, setMasterVolume] = useState(0.9);
+  const [masterPlugins, setMasterPlugins] = useState<TrackPlugin[]>([]);
   const [trackLevels, setTrackLevels] = useState<Record<string, number>>({});
   const [playheadSeconds, setPlayheadSeconds] = useState(0);
   const [gridResolution, setGridResolution] = useState<"1/2" | "1/4" | "1/8">("1/4");
@@ -3544,21 +3546,35 @@ function MixStudioInner() {
             >
               + Add Track
             </button>
-            <div className="flex items-center gap-2">
-              <span className="text-white/60">Master</span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={masterVolume}
-                onChange={(event) => setMasterVolume(Number(event.target.value))}
-                className="h-1 w-32 accent-red-500"
-              />
-              <div className="h-6 w-2 overflow-hidden rounded bg-zinc-800">
-                <div
-                  className="h-full w-full origin-bottom bg-gradient-to-t from-red-500 via-yellow-400 to-emerald-400 transition-transform"
-                  style={{ transform: `scaleY(${masterLevel})` }}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-white/60">Master</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={masterVolume}
+                  onChange={(event) => setMasterVolume(Number(event.target.value))}
+                  className="h-1 w-32 accent-red-500"
+                />
+                <div className="h-6 w-2 overflow-hidden rounded bg-zinc-800">
+                  <div
+                    className="h-full w-full origin-bottom bg-gradient-to-t from-red-500 via-yellow-400 to-emerald-400 transition-transform"
+                    style={{ transform: `scaleY(${masterLevel})` }}
+                  />
+                </div>
+              </div>
+              <div className="mt-1 w-64">
+                <TrackPluginRack
+                  plugins={masterPlugins}
+                  hidePlugins={false}
+                  onChange={(next) => {
+                    setMasterPlugins(next);
+                  }}
+                  onOpen={(plugin) => {
+                    openPluginWindow("master-bus", plugin.id);
+                  }}
                 />
               </div>
             </div>
@@ -3749,9 +3765,12 @@ function MixStudioInner() {
         </div>
       </div>
       {openPluginEditors.map((ref, index) => {
-        const track = tracks.find((t) => t.id === ref.trackId);
-        const plugin = track?.plugins?.find((p) => p.id === ref.pluginId);
-        if (!track || !plugin) return null;
+        const isMasterBus = ref.trackId === "master-bus";
+        const track = isMasterBus ? null : tracks.find((t) => t.id === ref.trackId);
+        const plugin = isMasterBus
+          ? masterPlugins.find((p) => p.id === ref.pluginId)
+          : track?.plugins?.find((p) => p.id === ref.pluginId);
+        if (!plugin) return null;
         const windowId = `${ref.trackId}:${ref.pluginId}`;
         const pos = pluginWindowPositions[windowId] ?? { x: 24 + index * 16, y: 24 + index * 16 };
         return (
@@ -3766,16 +3785,20 @@ function MixStudioInner() {
               setPluginWindowPositions((prev) => ({ ...prev, [windowId]: nextPos }))
             }
             onChange={(next) => {
-              setTracks((prev) =>
-                prev.map((t) =>
-                  t.id === track.id
-                    ? {
-                        ...t,
-                        plugins: (t.plugins || []).map((p) => (p.id === plugin.id ? next : p)),
-                      }
-                    : t,
-                ),
-              );
+              if (isMasterBus) {
+                setMasterPlugins((prev) => prev.map((p) => (p.id === plugin.id ? next : p)));
+              } else if (track) {
+                setTracks((prev) =>
+                  prev.map((t) =>
+                    t.id === track.id
+                      ? {
+                          ...t,
+                          plugins: (t.plugins || []).map((p) => (p.id === plugin.id ? next : p)),
+                        }
+                      : t,
+                  ),
+                );
+              }
             }}
             onClose={() =>
               setOpenPluginEditors((prev) =>
