@@ -84,6 +84,10 @@ type ProcessedTrackResult = {
   // Optional AI-generated plugin chain that reflects what the
   // assistant applied for this processing pass.
   plugins?: TrackPlugin[];
+  // Optional intelligent analysis + suggested chain coming
+  // directly from the DSP engine.
+  intelligentAnalysis?: any;
+  intelligentPluginChain?: any[];
 };
 
 type StudioMode =
@@ -1056,6 +1060,45 @@ function getInitialTracksForMode(mode: StudioMode): TrackType[] {
         },
       ];
   }
+}
+
+function buildPluginsFromIntelligentChain(
+  trackId: string,
+  chain: Array<{ plugin: string; params: any }> | undefined | null,
+): TrackPlugin[] {
+  if (!Array.isArray(chain) || !chain.length) return [];
+
+  const plugins: TrackPlugin[] = [];
+
+  chain.forEach((item, index) => {
+    const rawType = item?.plugin as unknown;
+    if (!rawType || !isPluginType(rawType)) return;
+    const type = rawType;
+    const id = crypto.randomUUID();
+
+    plugins.push({
+      id,
+      pluginId: id,
+      trackId,
+      pluginType: type,
+      name: `AI ${defaultPluginName(type)}`,
+      order: index,
+      // Keep real-time WebAudio safe by using normal defaults for the
+      // audible params while storing the DSP's exact settings on
+      // aiParams for UI/overlay display.
+      params: defaultPluginParams(type),
+      aiParams: {
+        ...defaultAIParams(type),
+        dspConfig: item.params ?? {},
+      },
+      preset: "AI Intelligent Chain",
+      enabled: true,
+      aiGenerated: true,
+      locked: true,
+    });
+  });
+
+  return plugins;
 }
 
 function MixStudioInner() {
@@ -2038,6 +2081,9 @@ function MixStudioInner() {
       output_files?: { wav?: string | null; mp3?: string | null };
       track_type?: string;
       preset?: string;
+      plugin_chain?: unknown;
+      intelligent_analysis?: any;
+      intelligent_plugin_chain?: any;
     } = await response.json();
 
     if (data.status !== "processed") {
@@ -2063,15 +2109,22 @@ function MixStudioInner() {
       type: blob.type || "audio/wav",
     });
 
-    const aiPlugins = buildAIPluginsForTrack(
-      track.id,
-      trackType,
-      presetName,
-      genreKey,
-      track.role,
-      currentFeatureType || undefined,
-      selectedPreset?.id ?? null,
-    );
+    const intelligentChain = data.intelligent_plugin_chain as
+      | Array<{ plugin: string; params: any }>
+      | undefined
+      | null;
+
+    const aiPlugins = intelligentChain && intelligentChain.length
+      ? buildPluginsFromIntelligentChain(track.id, intelligentChain)
+      : buildAIPluginsForTrack(
+          track.id,
+          trackType,
+          presetName,
+          genreKey,
+          track.role,
+          currentFeatureType || undefined,
+          selectedPreset?.id ?? null,
+        );
 
     return {
       file: processedFile,
@@ -2080,6 +2133,8 @@ function MixStudioInner() {
         mp3: mp3Url,
       },
       plugins: aiPlugins,
+      intelligentAnalysis: data.intelligent_analysis,
+      intelligentPluginChain: intelligentChain ?? null,
     };
   };
 
@@ -2168,6 +2223,7 @@ function MixStudioInner() {
         name: displayName,
         state: "idle" as TrackProcessingStatus["state"],
         percentage: 0,
+        detail: null,
       };
     });
 
@@ -2363,6 +2419,18 @@ function MixStudioInner() {
           updates.set(track.id, processed);
           anyUpdated = true;
 
+          const chain = processed.intelligentPluginChain as
+            | Array<{ plugin: string; params: any }>
+            | undefined
+            | null;
+          const summary =
+            chain && chain.length
+              ? chain
+                  .map((item) => (item && typeof item.plugin === "string" ? item.plugin : null))
+                  .filter((name) => !!name)
+                  .join(", ")
+              : null;
+
           const completedPercent = ((index + 1) / playableForLoop.length) * 100;
           setProcessingOverlay((prev): ProcessingOverlayState | null => {
             if (!prev) return prev;
@@ -2372,6 +2440,9 @@ function MixStudioInner() {
                   ...t,
                   state: "completed" as TrackProcessingStatus["state"],
                   percentage: completedPercent,
+                  detail: summary
+                    ? `DSP: ${summary}`
+                    : t.detail ?? null,
                 };
               }
               return t;
@@ -2498,6 +2569,18 @@ function MixStudioInner() {
     try {
       const processed = await processTrackWithAI(target, { forceMaster: true });
       if (processed) {
+        // If the DSP provided an intelligent master chain, mirror it
+        // into the master-bus rack so the bottom UI shows exactly
+        // what will be applied on the rendered master.
+        if (processed.intelligentPluginChain && Array.isArray(processed.intelligentPluginChain)) {
+          setMasterPlugins(
+            buildPluginsFromIntelligentChain(
+              "master-bus",
+              processed.intelligentPluginChain as Array<{ plugin: string; params: any }>,
+            ),
+          );
+        }
+
         const targetId = target.id;
         setTracks((prev) =>
           prev.map((track) => {
