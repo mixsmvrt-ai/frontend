@@ -73,6 +73,9 @@ export interface TrackProcessingStatus {
   name: string;
   state: TrackProcessingState;
   percentage: number;
+  // Optional human-readable summary of what the DSP analyzed
+  // and plans to do for this track (e.g. EQ, compression, etc.).
+  detail?: string | null;
 }
 
 export interface ProcessingOverlayState {
@@ -379,16 +382,23 @@ export function ProcessingOverlay({ state, stages, queuePosition, queueSize, onC
                     key={track.id}
                     className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-2 py-1"
                   >
-                    <div className="flex flex-1 items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                      <span className="truncate text-white/80">{track.name}</span>
+                    <div className="flex flex-1 flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                        <span className="truncate text-white/80">{track.name}</span>
+                        <span className="ml-auto text-[10px] text-white/60">
+                          {track.state === "processing" && `${Math.round(track.percentage)}%`}
+                          {track.state === "completed" && "Done"}
+                          {track.state === "idle" && "Queued"}
+                          {track.state === "failed" && "Failed"}
+                        </span>
+                      </div>
+                      {track.detail && (
+                        <p className="truncate text-[10px] text-white/50">
+                          {track.detail}
+                        </p>
+                      )}
                     </div>
-                    <span className="text-[10px] text-white/60">
-                      {track.state === "processing" && `${Math.round(track.percentage)}%`}
-                      {track.state === "completed" && "Done"}
-                      {track.state === "idle" && "Queued"}
-                      {track.state === "failed" && "Failed"}
-                    </span>
                   </div>
                 ))}
               </div>
