@@ -2134,7 +2134,7 @@ function MixStudioInner() {
       },
       plugins: aiPlugins,
       intelligentAnalysis: data.intelligent_analysis,
-      intelligentPluginChain: intelligentChain ?? null,
+      intelligentPluginChain: intelligentChain ?? undefined,
     };
   };
 
