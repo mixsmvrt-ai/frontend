@@ -11,7 +11,7 @@ type TrackPluginRackProps = {
   hidePlugins?: boolean;
 };
 
-const MAX_SLOTS = 8;
+const MAX_SLOTS = 10;
 
 const AVAILABLE_PLUGIN_TYPES: PluginType[] = [
   "EQ",
@@ -59,7 +59,7 @@ export default function TrackPluginRack({ plugins, onChange, onOpen, hidePlugins
   return (
     <div className="flex w-full items-start gap-2">
       <div className="flex w-full flex-col">
-        <div className="grid w-full grid-cols-4 gap-1">
+        <div className="grid w-full grid-cols-5 gap-1">
           {Array.from({ length: MAX_SLOTS }).map((_, index) => {
             const plugin = sorted.find((p) => p.order === index);
             if (!plugin) {
