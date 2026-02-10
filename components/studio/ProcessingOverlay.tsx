@@ -9,63 +9,6 @@ export type ProcessingStage = {
   label: string;
 };
 
-export const PROCESSING_STAGES: ProcessingStage[] = [
-  { id: "analyze", label: "Analyzing audio" },
-  { id: "detect-vocals", label: "Detecting vocal characteristics" },
-  { id: "denoise", label: "Cleaning noise & artifacts" },
-  { id: "eq", label: "Applying EQ" },
-  { id: "compress", label: "Applying compression" },
-  { id: "saturate", label: "Adding saturation" },
-  { id: "stereo", label: "Stereo enhancement" },
-  { id: "loudness", label: "Loudness normalization" },
-  { id: "finalize", label: "Finalizing output" },
-];
-
-// Frontend-side templates that mirror the backend FLOW_STEP_TEMPLATES
-// in backend/main.py. These are used to customize the overlay per
-// flow even before the backend has returned a job status payload.
-export const FLOW_PROCESSING_STAGE_TEMPLATES: Record<string, ProcessingStage[]> = {
-  audio_cleanup: [
-    { id: "Analyzing audio", label: "Analyzing audio" },
-    { id: "Noise reduction", label: "Noise reduction" },
-    { id: "Artifact cleanup", label: "Artifact cleanup" },
-    { id: "EQ cleanup", label: "EQ cleanup" },
-    { id: "Output rendering", label: "Output rendering" },
-  ],
-  mixing_only: [
-    { id: "Analyzing audio", label: "Analyzing audio" },
-    { id: "Gain staging", label: "Gain staging" },
-    { id: "Applying EQ", label: "Applying EQ" },
-    { id: "Applying compression", label: "Applying compression" },
-    { id: "Adding saturation", label: "Adding saturation" },
-    { id: "Stereo enhancement", label: "Stereo enhancement" },
-    { id: "Mix render", label: "Mix render" },
-  ],
-  mix_master: [
-    { id: "Analyzing audio", label: "Analyzing audio" },
-    { id: "Detecting vocal characteristics", label: "Detecting vocal characteristics" },
-    { id: "Cleaning noise & artifacts", label: "Cleaning noise & artifacts" },
-    { id: "Gain staging", label: "Gain staging" },
-    { id: "Applying EQ", label: "Applying EQ" },
-    { id: "Applying compression", label: "Applying compression" },
-    { id: "De-essing", label: "De-essing" },
-    { id: "Adding saturation", label: "Adding saturation" },
-    { id: "Stereo enhancement", label: "Stereo enhancement" },
-    { id: "Bus processing", label: "Bus processing" },
-    { id: "Loudness normalization", label: "Loudness normalization" },
-    { id: "Finalizing output", label: "Finalizing output" },
-  ],
-  mastering_only: [
-    { id: "Analyzing mix", label: "Analyzing mix" },
-    { id: "Linear EQ", label: "Linear EQ" },
-    { id: "Multiband compression", label: "Multiband compression" },
-    { id: "Stereo imaging", label: "Stereo imaging" },
-    { id: "Limiting", label: "Limiting" },
-    { id: "Loudness normalization", label: "Loudness normalization" },
-    { id: "Final render", label: "Final render" },
-  ],
-};
-
 export type TrackProcessingState = "idle" | "processing" | "completed" | "failed";
 
 export interface TrackProcessingStatus {
@@ -88,15 +31,18 @@ export interface ProcessingOverlayState {
   error?: string | null;
   estimatedTotalSec?: number | null;
   remainingSec?: number | null;
+  // Queue + job metadata from the backend. When phase === "queued",
+  // the overlay renders in a queue-focused state until processing
+  // actually begins.
+  phase?: "idle" | "queued" | "processing" | "completed" | "failed";
+  queuePosition?: number | null;
+  queueSize?: number | null;
+  helperMessage?: string | null;
 }
 
 interface ProcessingOverlayProps {
   state: ProcessingOverlayState | null;
   stages?: ProcessingStage[];
-  // Optional queue metadata so a parent can show where this
-  // job sits in line when many users are processing.
-  queuePosition?: number | null;
-  queueSize?: number | null;
   onCancel?: () => void;
   onDownload?: () => void;
 }
@@ -199,11 +145,23 @@ function WaveformSkeleton() {
   );
 }
 
-export function ProcessingOverlay({ state, stages, queuePosition, queueSize, onCancel, onDownload }: ProcessingOverlayProps) {
+export function ProcessingOverlay({ state, stages, onCancel, onDownload }: ProcessingOverlayProps) {
   if (!state || !state.active) return null;
 
-  const { mode, percentage, currentStageId, completedStageIds, tracks, error } = state;
-  const stageList = stages && stages.length ? stages : PROCESSING_STAGES;
+  const {
+    mode,
+    percentage,
+    currentStageId,
+    completedStageIds,
+    tracks,
+    error,
+    phase = "processing",
+    queuePosition,
+    queueSize,
+    helperMessage,
+  } = state;
+
+  const stageList = stages && stages.length ? stages : [];
   const currentStage = stageList.find((s) => s.id === currentStageId);
 
   const totalTracks = tracks.length;
@@ -239,11 +197,6 @@ export function ProcessingOverlay({ state, stages, queuePosition, queueSize, onC
     };
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
-              {typeof queuePosition === "number" && typeof queueSize === "number" && queueSize > 1 && (
-                <span className="text-[10px] text-amber-300">
-                  Queue: you are #{queuePosition} of {queueSize} for this flow
-                </span>
-              )}
     } catch {
       // no-op
     }
@@ -302,10 +255,16 @@ export function ProcessingOverlay({ state, stages, queuePosition, queueSize, onC
         >
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-red-400">
-              {mode === "mix" ? "Processing Full Mix" : "Processing Track"}
+              {phase === "queued"
+                ? "In queue for processing"
+                : mode === "mix"
+                ? "Processing Full Mix"
+                : "Processing Track"}
             </p>
             <h2 className="mt-1 text-sm font-semibold text-white sm:text-base">
-              Let MIXSMVRT finish your chain.
+              {phase === "queued"
+                ? "Your session will start automatically as soon as it's your turn."
+                : "Let MIXSMVRT finish your chain."}
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -328,35 +287,73 @@ export function ProcessingOverlay({ state, stages, queuePosition, queueSize, onC
         <div className="grid gap-4 sm:grid-cols-[1.4fr_1.1fr] sm:items-start">
           <div className="space-y-3">
             <WaveformSkeleton />
-            <ProgressBar
-              value={percentage}
-              label={currentStage ? currentStage.label : "Processing"}
-            />
 
-            {typeof state.remainingSec === "number" && state.remainingSec > 0 && (
-              <p className="text-[11px] text-white/60">
-                Time remaining: ~
-                {Math.floor(state.remainingSec / 60)}
-                m {Math.max(0, Math.round(state.remainingSec % 60))}
-                s
-              </p>
+            {phase === "queued" ? (
+              <div className="space-y-2">
+                <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-2 text-[11px] text-amber-100">
+                  <p className="font-medium">
+                    {typeof queuePosition === "number" && typeof queueSize === "number" && queueSize > 0
+                      ? `You are ${queuePosition} in the queue for this flow.`
+                      : "Your job is waiting for an available DSP slot."}
+                  </p>
+                  {typeof queueSize === "number" && queueSize > 1 && (
+                    <p className="mt-1 text-amber-100/80">
+                      There are {queueSize - 1} other jobs ahead of you.
+                    </p>
+                  )}
+                  <p className="mt-1 text-amber-100/80">
+                    Processing will start automatically. You can keep editing your session while you wait.
+                  </p>
+                </div>
+
+                {typeof state.remainingSec === "number" && state.remainingSec > 0 && (
+                  <p className="text-[11px] text-white/60">
+                    Estimated wait: ~
+                    {Math.floor(state.remainingSec / 60)}m {Math.max(0, Math.round(state.remainingSec % 60))}s
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                <ProgressBar
+                  value={percentage}
+                  label={currentStage ? currentStage.label : "Processing"}
+                />
+
+                {typeof state.remainingSec === "number" && state.remainingSec > 0 && (
+                  <p className="text-[11px] text-white/60">
+                    Time remaining: ~
+                    {Math.floor(state.remainingSec / 60)}m {Math.max(0, Math.round(state.remainingSec % 60))}s
+                  </p>
+                )}
+
+                {helperMessage && (
+                  <p className="text-[11px] text-white/60">
+                    {helperMessage}
+                  </p>
+                )}
+              </>
             )}
 
             <div className="mt-2 rounded-xl border border-white/10 bg-black/60 p-2 text-[11px] text-white/60">
               <p>
                 {error
                   ? "Something went wrong while processing this audio. You can adjust your upload and try again."
+                  : phase === "queued"
+                  ? "Your job is in line with other sessions. MIXSMVRT will begin processing as soon as resources free up."
                   : "MIXSMVRT is running your audio through a full studio chain tuned for streaming and club playback."}
               </p>
             </div>
           </div>
 
           <div className="flex flex-col gap-3">
-            <ProcessingStageList
-              stages={stageList}
-              currentStageId={currentStageId}
-              completedStageIds={completedStageIds}
-            />
+            {stageList.length > 0 && (
+              <ProcessingStageList
+                stages={stageList}
+                currentStageId={currentStageId}
+                completedStageIds={completedStageIds}
+              />
+            )}
 
             <div className="mt-1 space-y-1 rounded-xl border border-white/10 bg-black/70 p-2">
               <div className="flex items-center justify-between text-[11px] text-white/60">
