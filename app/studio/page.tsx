@@ -13,16 +13,16 @@ import {
   ProcessingOverlay,
   type ProcessingOverlayState,
   type TrackProcessingStatus,
-  PROCESSING_STAGES,
   type ProcessingStage,
-  FLOW_PROCESSING_STAGE_TEMPLATES,
 } from "../../components/studio/ProcessingOverlay";
 import {
   PresetSelector,
   type StudioPresetMeta,
   type ThrowFxMode,
 } from "../../components/studio/PresetSelector";
-import { useBackendJobStatus } from "../../lib/useBackendJobStatus";
+import { useProcessingJob } from "../../lib/useProcessingJob";
+import type { FlowKey } from "../../lib/flowSteps";
+import { getFlowSteps } from "../../lib/flowSteps";
 import type { TrackPlugin } from "../../components/studio/pluginTypes";
 import {
   defaultAIParams,
@@ -1294,6 +1294,22 @@ function MixStudioInner() {
   const [undoStack, setUndoStack] = useState<StudioSnapshot[]>([]);
   const [redoStack, setRedoStack] = useState<StudioSnapshot[]>([]);
 
+  const isMixMasterMode = studioMode === "mix-master";
+  const isMixOnlyMode = studioMode === "mix-only";
+  const isMasterOnlyMode = studioMode === "master-only";
+  const isCleanupMode = studioMode === "cleanup";
+  const isPodcastMode = studioMode === "podcast";
+
+  const featureForMode: FeatureType | null = isCleanupMode
+    ? "audio_cleanup"
+    : isMixOnlyMode
+      ? "mixing_only"
+      : isMixMasterMode
+        ? "mix_master"
+        : isMasterOnlyMode
+          ? "mastering_only"
+          : null;
+
   const createSnapshot = (): StudioSnapshot => ({
     tracks: tracks.map((track) => ({ ...track })),
     hasMixed,
@@ -1318,7 +1334,22 @@ function MixStudioInner() {
     setRedoStack([]);
   };
 
-  const backendJobStatus = useBackendJobStatus(activeJobId);
+  const selectedPresetMeta = useMemo(
+    () => availablePresets.find((p) => p.id === selectedPresetId) ?? null,
+    [availablePresets, selectedPresetId],
+  );
+
+  const { backend: backendJobStatus, ui: processingJobUi } = useProcessingJob(activeJobId, {
+    flow: (featureForMode as FlowKey | null) ?? null,
+    presetLabelContext:
+      selectedPresetMeta && featureForMode
+        ? {
+            presetName: selectedPresetMeta.name,
+            toneDescription: selectedPresetMeta.intent || selectedPresetMeta.description,
+            subtitle: selectedPresetMeta.inspired_style || null,
+          }
+        : null,
+  });
 
   // Compute global playhead X position in pixels (shared with Timeline and track area)
   const pixelsPerSecond = 60 * zoom;
@@ -1685,56 +1716,41 @@ function MixStudioInner() {
 
     setProcessingOverlay((prev): ProcessingOverlayState | null => {
       if (!prev) return prev;
+      const ui = processingJobUi;
 
-      const steps = backendJobStatus.steps ?? undefined;
-      let currentStageId = prev.currentStageId;
-      let completedStageIds = prev.completedStageIds;
+      // Derive a ProcessingStage list from the UI steps so the
+      // overlay can render a vertical checklist.
+      const dynamicStages: ProcessingStage[] = ui.steps.map((step) => ({
+        id: step.key,
+        label: step.label,
+      }));
+      setOverlayStages(dynamicStages);
 
-      if (steps && steps.length) {
-        const dynamicStages: ProcessingStage[] = steps.map((s) => ({
-          id: s.name,
-          label: s.name,
-        }));
-        setOverlayStages(dynamicStages);
-
-        const completedNames = steps.filter((s) => s.completed).map((s) => s.name);
-        const firstIncomplete = steps.find((s) => !s.completed);
-        currentStageId = firstIncomplete?.name ?? steps[steps.length - 1].name;
-        completedStageIds = completedNames;
-      }
+      const completedStageIds = ui.steps.filter((s) => s.completed).map((s) => s.key);
+      const currentStageId = ui.currentStepKey ?? prev.currentStageId;
 
       const nextError =
-        backendJobStatus.status === "failed"
-          ? backendJobStatus.error_message ||
+        ui.phase === "failed"
+          ? ui.errorMessage ||
             prev.error ||
             "Something went wrong while processing this audio."
           : prev.error;
 
-      const estimatedTotalSec =
-        typeof backendJobStatus.estimated_total_sec === "number"
-          ? backendJobStatus.estimated_total_sec
-          : prev.estimatedTotalSec ?? null;
-
-      let remainingSec: number | null = prev.remainingSec ?? null;
-      if (typeof backendJobStatus.elapsed_sec === "number" && estimatedTotalSec) {
-        const rawRemaining = estimatedTotalSec - backendJobStatus.elapsed_sec;
-        remainingSec = Math.max(0, rawRemaining);
-      }
-
       return {
         ...prev,
-        percentage:
-          typeof backendJobStatus.progress === "number"
-            ? backendJobStatus.progress
-            : prev.percentage,
+        percentage: ui.overallProgress,
         currentStageId,
         completedStageIds,
         error: nextError,
-        estimatedTotalSec,
-        remainingSec,
+        estimatedTotalSec: ui.estimatedTotalSec ?? prev.estimatedTotalSec ?? null,
+        remainingSec: ui.remainingSec ?? prev.remainingSec ?? null,
+        phase: ui.phase,
+        queuePosition: ui.queuePosition,
+        queueSize: ui.queueSize,
+        helperMessage: ui.helperText ?? prev.helperMessage ?? null,
       };
     });
-  }, [backendJobStatus]);
+  }, [backendJobStatus, processingJobUi]);
 
   const handleVolumeChange = useCallback((trackId: string, volume: number) => {
     setTracks((prev) =>
@@ -2153,12 +2169,16 @@ function MixStudioInner() {
 
     const featureType = featureTypeForMode(studioMode) ?? "mix_master";
     const jobType = jobTypeForFeature(featureType);
-    const flowStages =
-      FLOW_PROCESSING_STAGE_TEMPLATES[featureType] &&
-      FLOW_PROCESSING_STAGE_TEMPLATES[featureType].length
-        ? FLOW_PROCESSING_STAGE_TEMPLATES[featureType]
-        : PROCESSING_STAGES;
-    const initialStageId = (flowStages[0] ?? PROCESSING_STAGES[0]).id;
+
+    // Use the centralized flowSteps config to derive the initial
+    // step list for this run, so the overlay can show meaningful
+    // stage labels even before the backend has returned status.
+    const labeledSteps = getFlowSteps(featureType as FlowKey, null);
+    const flowStages: ProcessingStage[] = labeledSteps.map((step) => ({
+      id: step.key,
+      label: step.label,
+    }));
+    const initialStageId = (flowStages[0] ?? { id: "processing" }).id;
 
     const playable = tracks.filter((track) => track.file);
 
@@ -2380,10 +2400,10 @@ function MixStudioInner() {
         }
 
         const track = playableForLoop[index];
-        // Show a small non-zero progress value while the first track is running
-        const baseProgress = (index / playableForLoop.length) * 100;
-        const progressForTrack = Math.max(5, baseProgress);
 
+        // Mark the per-track row as actively processing. Overall
+        // progress and step advancement are driven purely by the
+        // backend job status, not by this local loop.
         setProcessingOverlay((prev): ProcessingOverlayState | null => {
           if (!prev) return prev;
           const updatedTracks: TrackProcessingStatus[] = prev.tracks.map((t) => {
@@ -2391,24 +2411,13 @@ function MixStudioInner() {
               return {
                 ...t,
                 state: "processing" as TrackProcessingStatus["state"],
-                percentage: progressForTrack,
               };
             }
             return t;
           });
 
-          const stageIndex = Math.min(
-            flowStages.length - 1,
-            Math.floor((progressForTrack / 100) * flowStages.length),
-          );
-          const currentStage = flowStages[stageIndex];
-          const completedStageIds = flowStages.slice(0, stageIndex).map((s) => s.id);
-
           return {
             ...prev,
-            percentage: progressForTrack,
-            currentStageId: currentStage.id,
-            completedStageIds,
             tracks: updatedTracks,
           };
         });
@@ -2431,7 +2440,6 @@ function MixStudioInner() {
                   .join(", ")
               : null;
 
-          const completedPercent = ((index + 1) / playableForLoop.length) * 100;
           setProcessingOverlay((prev): ProcessingOverlayState | null => {
             if (!prev) return prev;
             const updatedTracks: TrackProcessingStatus[] = prev.tracks.map((t) => {
@@ -2439,7 +2447,6 @@ function MixStudioInner() {
                 return {
                   ...t,
                   state: "completed" as TrackProcessingStatus["state"],
-                  percentage: completedPercent,
                   detail: summary
                     ? `DSP: ${summary}`
                     : t.detail ?? null,
@@ -2447,21 +2454,8 @@ function MixStudioInner() {
               }
               return t;
             });
-
-            const stageIndex = Math.min(
-              flowStages.length - 1,
-              Math.floor((completedPercent / 100) * flowStages.length),
-            );
-            const currentStage = flowStages[stageIndex];
-            const completedStageIds = flowStages
-              .slice(0, stageIndex + 1)
-              .map((s) => s.id);
-
             return {
               ...prev,
-              percentage: completedPercent,
-              currentStageId: currentStage.id,
-              completedStageIds,
               tracks: updatedTracks,
             };
           });
@@ -2513,19 +2507,8 @@ function MixStudioInner() {
         });
       }
       setHasMixed(!processingCancelRef.current && anyUpdated);
-      if (!processingCancelRef.current && anyUpdated) {
-        setProcessingOverlay((prev): ProcessingOverlayState | null =>
-          prev
-            ? {
-                ...prev,
-                percentage: 100,
-                currentStageId:
-                  (flowStages[flowStages.length - 1] ?? flowStages[0]).id,
-                completedStageIds: flowStages.map((s) => s.id),
-              }
-            : prev,
-        );
-      }
+      // Final overall progress and step completion are driven by the
+      // backend job status updates rather than the local loop.
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Error processing mix with AI", error);
@@ -2783,11 +2766,8 @@ function MixStudioInner() {
     selectedClipTrackId,
   ]);
 
-  const isMixMasterMode = studioMode === "mix-master";
-  const isMixOnlyMode = studioMode === "mix-only";
-  const isMasterOnlyMode = studioMode === "master-only";
-  const isCleanupMode = studioMode === "cleanup";
-  const isPodcastMode = studioMode === "podcast";
+  // isMixMasterMode, isMixOnlyMode, isMasterOnlyMode, isCleanupMode, isPodcastMode
+  // are defined above, close to featureForMode so they can be reused here.
   const hasBeatTrack = tracks.some((track) => track.role === "beat" && track.file);
 
   const handleCancelProcessingOverlay = () => {
@@ -2812,15 +2792,6 @@ function MixStudioInner() {
     return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
   }, [closeTopmostPluginWindow, openPluginEditors.length]);
 
-  const featureForMode: FeatureType | null = isCleanupMode
-    ? "audio_cleanup"
-    : isMixOnlyMode
-      ? "mixing_only"
-      : isMixMasterMode
-        ? "mix_master"
-        : isMasterOnlyMode
-          ? "mastering_only"
-          : null;
   const isPrimaryFeatureLocked =
     featureForMode != null && !userFeatureAccess[featureForMode] && !isAdmin;
 
@@ -3297,8 +3268,6 @@ function MixStudioInner() {
       <ProcessingOverlay
         state={processingOverlay}
         stages={overlayStages}
-        queuePosition={backendJobStatus?.queue_position ?? null}
-        queueSize={backendJobStatus?.queue_size ?? null}
         onCancel={handleCancelProcessingOverlay}
         onDownload={
           processingOverlay &&
