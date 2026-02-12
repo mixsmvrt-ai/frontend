@@ -2972,13 +2972,31 @@ function MixStudioInner() {
 
       setIsSavingProject(true);
       try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData.session?.user?.id;
+        if (!userId) {
+          router.push("/login");
+          return;
+        }
+
+        const flowKey: FlowKey =
+          featureForMode === "audio_cleanup" ||
+          featureForMode === "mixing_only" ||
+          featureForMode === "mix_master" ||
+          featureForMode === "mastering_only"
+            ? (featureForMode as FlowKey)
+            : "mix_master";
+
         const meta = buildProjectMeta();
         const now = new Date().toISOString();
 
         const { data, error } = await supabase
           .from("projects")
           .insert({
+            user_id: userId,
             name,
+            flow_key: flowKey,
+            status: "draft",
             meta,
             autosave_interval_min: autosaveMinutes,
             last_saved_at: now,
@@ -3013,7 +3031,9 @@ function MixStudioInner() {
     [
       autosaveMinutes,
       buildProjectMeta,
+      featureForMode,
       isSupabaseConfigured,
+      router,
       supabase,
     ],
   );
