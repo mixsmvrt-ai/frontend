@@ -17,6 +17,7 @@ const AVAILABLE_PLUGIN_TYPES: PluginType[] = [
   "EQ",
   "Compressor",
   "De-esser",
+  "Pitch Correction",
   "Saturation",
   "Reverb",
   "Delay",

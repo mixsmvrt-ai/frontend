@@ -4,6 +4,7 @@ export type PluginType =
   | "EQ"
   | "Compressor"
   | "De-esser"
+  | "Pitch Correction"
   | "Saturation"
   | "Reverb"
   | "Delay"
@@ -42,6 +43,7 @@ export const PLUGIN_TYPE_TO_CATEGORY: Record<PluginType, PluginCategory> = {
   EQ: "EQ",
   Compressor: "Dynamics",
   "De-esser": "Dynamics",
+  "Pitch Correction": "Dynamics",
   Saturation: "FX",
   Reverb: "FX",
   Delay: "FX",
@@ -56,6 +58,7 @@ export function isPluginType(value: unknown): value is PluginType {
     value === "EQ" ||
     value === "Compressor" ||
     value === "De-esser" ||
+    value === "Pitch Correction" ||
     value === "Saturation" ||
     value === "Reverb" ||
     value === "Delay" ||
@@ -74,6 +77,8 @@ export function defaultPluginName(type: PluginType): string {
       return "Channel Comp";
     case "De-esser":
       return "De-Esser";
+    case "Pitch Correction":
+      return "Pitch Correction";
     case "Saturation":
       return "Saturation";
     case "Reverb":
@@ -221,6 +226,18 @@ export function defaultPluginParams(type: PluginType): PluginParams {
         mid_width: 1.0,
         high_width: 1.15,
         mono_check: false,
+        mix: 1,
+        output_gain: 0,
+      };
+
+    case "Pitch Correction":
+      return {
+        enabled: true,
+        amount: 80, // percent correction strength
+        speed: 60, // 0 (slow) .. 100 (fast)
+        humanize: 40, // 0 (robotic) .. 100 (natural)
+        formant: 0, // -1..1 formant shift
+        advanced: false,
         mix: 1,
         output_gain: 0,
       };

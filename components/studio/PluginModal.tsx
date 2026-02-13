@@ -7,6 +7,7 @@ import PluginShell from "./plugins/PluginShell";
 import ParametricEQ from "./plugins/ParametricEQ";
 import Compressor from "./plugins/Compressor";
 import DeEsser from "./plugins/DeEsser";
+import PitchCorrectionPlugin from "./plugins/PitchCorrection";
 import Saturation from "./plugins/Saturation";
 import Reverb from "./plugins/Reverb";
 import Delay from "./plugins/Delay";
@@ -55,6 +56,8 @@ export default function PluginModal({
         return <Compressor plugin={local} onChange={commit} />;
       case "De-esser":
         return <DeEsser plugin={local} onChange={commit} />;
+      case "Pitch Correction":
+        return <PitchCorrectionPlugin plugin={local} onChange={commit} />;
       case "Saturation":
         return <Saturation plugin={local} onChange={commit} />;
       case "Reverb":
