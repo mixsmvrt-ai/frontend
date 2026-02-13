@@ -169,89 +169,13 @@ export function ProcessingOverlay({ state, stages, onCancel, onDownload }: Proce
   const processingTracks = tracks.filter((t) => t.state === "processing").length;
   const analyzedTracks = completedTracks + processingTracks;
 
-  const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const [position, setPosition] = React.useState<{ x: number; y: number }>({ x: 24, y: 80 });
-  const dragRef = React.useRef<
-    | {
-        pointerId: number;
-        startClientX: number;
-        startClientY: number;
-        startX: number;
-        startY: number;
-      }
-    | null
-  >(null);
-
-  const beginDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    const target = event.target as HTMLElement | null;
-    if (target && target.closest("button,select,input,textarea,a,[data-no-drag]")) {
-      return;
-    }
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startX: position.x,
-      startY: position.y,
-    };
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // no-op
-    }
-    event.preventDefault();
-  };
-
-  const onDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    if (event.pointerId !== drag.pointerId) return;
-
-    const dx = event.clientX - drag.startClientX;
-    const dy = event.clientY - drag.startClientY;
-    const nextRaw = { x: drag.startX + dx, y: drag.startY + dy };
-
-    const margin = 8;
-    const rect = containerRef.current?.getBoundingClientRect();
-    const w = rect?.width ?? 520;
-    const h = rect?.height ?? 360;
-    const maxX = Math.max(margin, window.innerWidth - w - margin);
-    const maxY = Math.max(margin, window.innerHeight - h - margin);
-
-    const next = {
-      x: clamp(nextRaw.x, margin, maxX),
-      y: clamp(nextRaw.y, margin, maxY),
-    };
-
-    setPosition(next);
-  };
-
-  const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    if (event.pointerId !== drag.pointerId) return;
-    dragRef.current = null;
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // no-op
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-40 pointer-events-none">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div
-        ref={containerRef}
-        className="pointer-events-auto fixed w-full max-w-xl rounded-2xl border border-white/10 bg-[#0b0b0b]/95 p-4 shadow-[0_0_60px_rgba(0,0,0,0.85)] sm:p-5"
-        style={{ left: position.x, top: position.y }}
+        className="pointer-events-auto flex w-full max-w-4xl max-h-[min(90vh,640px)] flex-col rounded-3xl border border-white/10 bg-[#050507]/95 p-4 shadow-[0_0_70px_rgba(0,0,0,0.95)] sm:p-5"
       >
         <div
-          className="mb-3 flex cursor-move items-center justify-between gap-3"
-          onPointerDown={beginDrag}
-          onPointerMove={onDragMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
+          className="mb-3 flex items-start justify-between gap-3"
         >
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-red-400">
@@ -284,8 +208,9 @@ export function ProcessingOverlay({ state, stages, onCancel, onDownload }: Proce
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-[1.4fr_1.1fr] sm:items-start">
-          <div className="space-y-3">
+        <div className="mt-1 flex-1 overflow-y-auto">
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)] sm:items-start">
+            <div className="space-y-3">
             <WaveformSkeleton />
 
             {phase === "queued" ? (
@@ -344,75 +269,77 @@ export function ProcessingOverlay({ state, stages, onCancel, onDownload }: Proce
                   : "MIXSMVRT is running your audio through a full studio chain tuned for streaming and club playback."}
               </p>
             </div>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            {stageList.length > 0 && (
-              <ProcessingStageList
-                stages={stageList}
-                currentStageId={currentStageId}
-                completedStageIds={completedStageIds}
-              />
-            )}
-
-            <div className="mt-1 space-y-1 rounded-xl border border-white/10 bg-black/70 p-2">
-              <div className="flex items-center justify-between text-[11px] text-white/60">
-                <span>{mode === "mix" ? "Track processing" : "Track status"}</span>
-                {totalTracks > 0 && (
-                  <span className="text-[10px] text-white/60">
-                    {analyzedTracks} / {totalTracks} tracks processed
-                  </span>
-                )}
-                {onCancel && (
-                  <button
-                    type="button"
-                    onClick={onCancel}
-                    className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/70 hover:border-red-400 hover:text-red-300"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-              <div className="max-h-28 space-y-1 overflow-y-auto pr-1 text-[11px]">
-                {tracks.map((track) => (
-                  <div
-                    key={track.id}
-                    className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-2 py-1"
-                  >
-                    <div className="flex flex-1 flex-col gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                        <span className="truncate text-white/80">{track.name}</span>
-                        <span className="ml-auto text-[10px] text-white/60">
-                          {track.state === "processing" && `${Math.round(track.percentage)}%`}
-                          {track.state === "completed" && "Done"}
-                          {track.state === "idle" && "Queued"}
-                          {track.state === "failed" && "Failed"}
-                        </span>
-                      </div>
-                      {track.detail && (
-                        <p className="truncate text-[10px] text-white/50">
-                          {track.detail}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
 
-            {error && (
-              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-100">
-                <p className="font-medium">Something went wrong while processing.</p>
-                <p className="mt-1 text-red-200/80">{error}</p>
-                <p className="mt-1 text-[10px] text-red-200/70">
-                  You can try again, or adjust your upload and rerun the chain.
-                </p>
+            <div className="flex flex-col gap-3">
+              {stageList.length > 0 && (
+                <ProcessingStageList
+                  stages={stageList}
+                  currentStageId={currentStageId}
+                  completedStageIds={completedStageIds}
+                />
+              )}
+
+              <div className="mt-1 space-y-1 rounded-xl border border-white/10 bg-black/70 p-2">
+                <div className="flex items-center justify-between text-[11px] text-white/60">
+                  <span>{mode === "mix" ? "Track processing" : "Track status"}</span>
+                  {totalTracks > 0 && (
+                    <span className="text-[10px] text-white/60">
+                      {analyzedTracks} / {totalTracks} tracks processed
+                    </span>
+                  )}
+                  {onCancel && (
+                    <button
+                      type="button"
+                      onClick={onCancel}
+                      className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/70 hover:border-red-400 hover:text-red-300"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-32 space-y-1 overflow-y-auto pr-1 text-[11px]">
+                  {tracks.map((track) => (
+                    <div
+                      key={track.id}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-2 py-1"
+                    >
+                      <div className="flex flex-1 flex-col gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                          <span className="truncate text-white/80">{track.name}</span>
+                          <span className="ml-auto text-[10px] text-white/60">
+                            {track.state === "processing" && `${Math.round(track.percentage)}%`}
+                            {track.state === "completed" && "Done"}
+                            {track.state === "idle" && "Queued"}
+                            {track.state === "failed" && "Failed"}
+                          </span>
+                        </div>
+                        {track.detail && (
+                          <p className="truncate text-[10px] text-white/50">
+                            {track.detail}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            )}
+
+              {error && (
+                <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-100">
+                  <p className="font-medium">Something went wrong while processing.</p>
+                  <p className="mt-1 text-red-200/80">{error}</p>
+                  <p className="mt-1 text-[10px] text-red-200/70">
+                    You can try again, or adjust your upload and rerun the chain.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+
+        <div className="mt-4 flex flex-col gap-2 border-t border-white/5 pt-3 sm:flex-row sm:items-center sm:justify-between">
           {onDownload && !error && (
             <div className="text-[11px] text-white/70">
               <p className="font-medium text-white">Your processing is complete.</p>
