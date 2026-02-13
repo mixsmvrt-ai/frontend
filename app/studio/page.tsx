@@ -561,18 +561,43 @@ function buildAIPluginsForTrack(
         createPlugin("EQ", addEqPreset, "AI Tone EQ", 3),
       );
     } else {
-      // Mixing / mix+master and other vocal flows use the
-      // full creative chain.
-      plugins.push(
-        createPlugin("EQ", subEqPreset, "AI Subtractive EQ", 0),
-        createPlugin("De-esser", deessPreset, "AI De-Esser", 1),
-        createPlugin("Compressor", levelCompPreset, "AI Level Comp", 2),
-        createPlugin("EQ", addEqPreset, "AI Additive EQ", 3),
-        createPlugin("Compressor", glueCompPreset, "AI Glue Comp", 4),
-        createPlugin("Saturation", satPreset, "AI Saturation", 5),
-        createPlugin("Reverb", reverbPreset, "AI Reverb", 6),
-        ...(delayPreset ? [createPlugin("Delay", delayPreset, "AI Delay", 7)] : []),
-      );
+      // Mixing / mix+master and other vocal flows.
+      // Main vocals get pitch correction plus the full chain,
+      // while background and adlib vocals use leaner chains
+      // so they support the lead without as many processors.
+      if (isBackgroundVocal) {
+        plugins.push(
+          createPlugin("EQ", subEqPreset, "AI Subtractive EQ", 0),
+          createPlugin("De-esser", deessPreset, "AI De-Esser", 1),
+          createPlugin("Compressor", levelCompPreset, "AI Level Comp", 2),
+          createPlugin("EQ", addEqPreset, "AI Additive EQ", 3),
+          createPlugin("Reverb", reverbPreset, "AI Reverb", 4),
+          ...(delayPreset ? [createPlugin("Delay", delayPreset, "AI Delay", 5)] : []),
+        );
+      } else if (isAdlibVocal) {
+        plugins.push(
+          createPlugin("EQ", subEqPreset, "AI Subtractive EQ", 0),
+          createPlugin("De-esser", deessPreset, "AI De-Esser", 1),
+          createPlugin("Compressor", levelCompPreset, "AI Level Comp", 2),
+          createPlugin("EQ", addEqPreset, "AI Additive EQ", 3),
+          createPlugin("Saturation", satPreset, "AI Saturation", 4),
+          createPlugin("Reverb", reverbPreset, "AI Reverb", 5),
+          ...(delayPreset ? [createPlugin("Delay", delayPreset, "AI Delay", 6)] : []),
+        );
+      } else {
+        // Lead vocal: pitch correction + full creative chain.
+        plugins.push(
+          createPlugin("Pitch Correction", undefined, "AI Pitch Correction", 0),
+          createPlugin("EQ", subEqPreset, "AI Subtractive EQ", 1),
+          createPlugin("De-esser", deessPreset, "AI De-Esser", 2),
+          createPlugin("Compressor", levelCompPreset, "AI Level Comp", 3),
+          createPlugin("EQ", addEqPreset, "AI Additive EQ", 4),
+          createPlugin("Compressor", glueCompPreset, "AI Glue Comp", 5),
+          createPlugin("Saturation", satPreset, "AI Saturation", 6),
+          createPlugin("Reverb", reverbPreset, "AI Reverb", 7),
+          ...(delayPreset ? [createPlugin("Delay", delayPreset, "AI Delay", 8)] : []),
+        );
+      }
     }
   } else if (trackType === "beat") {
     let subMeqPreset: string;
@@ -2129,22 +2154,18 @@ function MixStudioInner() {
       type: blob.type || "audio/wav",
     });
 
-    const intelligentChain = data.intelligent_plugin_chain as
-      | Array<{ plugin: string; params: any }>
-      | undefined
-      | null;
-
-    const aiPlugins = intelligentChain && intelligentChain.length
-      ? buildPluginsFromIntelligentChain(track.id, intelligentChain)
-      : buildAIPluginsForTrack(
-          track.id,
-          trackType,
-          presetName,
-          genreKey,
-          track.role,
-          currentFeatureType || undefined,
-          selectedPreset?.id ?? null,
-        );
+    // For now, always use the curated Studio AI chains so the
+    // visible plugin rack clearly shows the expected processing
+    // for each track role (beat, lead, background, adlibs).
+    const aiPlugins = buildAIPluginsForTrack(
+      track.id,
+      trackType,
+      presetName,
+      genreKey,
+      track.role,
+      currentFeatureType || undefined,
+      selectedPreset?.id ?? null,
+    );
 
     return {
       file: processedFile,
@@ -2154,7 +2175,6 @@ function MixStudioInner() {
       },
       plugins: aiPlugins,
       intelligentAnalysis: data.intelligent_analysis,
-      intelligentPluginChain: intelligentChain ?? undefined,
     };
   };
 
