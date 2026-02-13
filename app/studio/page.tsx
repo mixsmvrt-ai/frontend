@@ -1761,10 +1761,23 @@ function MixStudioInner() {
       const ui = processingJobUi;
 
       // Derive a ProcessingStage list from the UI steps so the
-      // overlay can render a vertical checklist.
+      // overlay can render a vertical checklist. Prefix the labels
+      // with the currently active track name (e.g. "Beat", "Main Vocal")
+      // so the steps feel contextual to whichever track is being
+      // processed at this moment.
+      let activeTrackLabel: string | null = null;
+      const activeTrack =
+        prev.tracks.find((t) => t.state === "processing") ??
+        prev.tracks.find((t) => t.state === "idle") ??
+        prev.tracks[0];
+
+      if (activeTrack) {
+        activeTrackLabel = activeTrack.name;
+      }
+
       const dynamicStages: ProcessingStage[] = ui.steps.map((step) => ({
         id: step.key,
-        label: step.label,
+        label: activeTrackLabel ? `${activeTrackLabel} – ${step.label}` : step.label,
       }));
       setOverlayStages(dynamicStages);
 
