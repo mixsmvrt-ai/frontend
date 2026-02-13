@@ -30,6 +30,9 @@ export type StudioPresetMeta = {
     bus?: Record<string, unknown>;
     limiter?: Record<string, unknown>;
   };
+  // Optional mapping to a concrete vocal preset profile in the DSP
+  // vocal preset catalog (flow:genre:preset_name).
+  vocal_preset_id?: string | null;
 };
 
 interface PresetSelectorProps {
