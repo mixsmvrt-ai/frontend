@@ -82,6 +82,12 @@ export const FLOW_STEPS: Record<FlowKey, FlowStep[]> = {
       helperText: "Detecting vocals, beats and supporting elements…",
     },
     {
+      key: "vocal-preset-selection",
+      baseLabel: "Selecting vocal tone preset",
+      presetScoped: true,
+      helperText: "Choosing a vocal tone that matches your vibe & genre…",
+    },
+    {
       key: "gain-staging",
       baseLabel: "Gain staging",
       helperText: "Balancing headroom across all tracks…",
@@ -93,9 +99,9 @@ export const FLOW_STEPS: Record<FlowKey, FlowStep[]> = {
     },
     {
       key: "vocal-eq-compression",
-      baseLabel: "Vocal EQ & compression",
+      baseLabel: "Preset-driven vocal EQ & compression",
       presetScoped: true,
-      helperText: "Shaping tone and dynamics to sit forward in the mix…",
+      helperText: "Shaping tone and dynamics using your selected vocal preset…",
     },
     {
       key: "beat-eq-vocal-pocket",
@@ -104,9 +110,9 @@ export const FLOW_STEPS: Record<FlowKey, FlowStep[]> = {
     },
     {
       key: "vocal-bus-glue",
-      baseLabel: "Vocal bus glue",
+      baseLabel: "Adapting vocal dynamics & FX",
       presetScoped: true,
-      helperText: "Gluing all vocal layers into a single performance…",
+      helperText: "Dialing compression, saturation, reverb and delay for the vocal bus…",
     },
     {
       key: "stereo-image-balance",
@@ -133,6 +139,12 @@ export const FLOW_STEPS: Record<FlowKey, FlowStep[]> = {
       helperText: "Profiling vocals, beats and buses for this session…",
     },
     {
+      key: "vocal-preset-selection",
+      baseLabel: "Selecting vocal tone preset",
+      presetScoped: true,
+      helperText: "Locking in a vocal tone preset tuned to this genre…",
+    },
+    {
       key: "gain-staging",
       baseLabel: "Gain staging",
       helperText: "Setting safe levels into the mix bus…",
@@ -144,9 +156,9 @@ export const FLOW_STEPS: Record<FlowKey, FlowStep[]> = {
     },
     {
       key: "vocal-eq-compression",
-      baseLabel: "Vocal EQ & compression",
+      baseLabel: "Preset-driven vocal EQ & compression",
       presetScoped: true,
-      helperText: "Tuning vocal tone and punch against the beat…",
+      helperText: "Tuning vocal tone and punch using the selected preset…",
     },
     {
       key: "beat-eq-vocal-pocket",
@@ -155,9 +167,9 @@ export const FLOW_STEPS: Record<FlowKey, FlowStep[]> = {
     },
     {
       key: "vocal-bus-glue",
-      baseLabel: "Vocal bus glue",
+      baseLabel: "Adapting vocal dynamics & FX",
       presetScoped: true,
-      helperText: "Applying bus compression and saturation to vocals…",
+      helperText: "Adapting compression, saturation and FX sends to the vocal preset…",
     },
     {
       key: "mix-balance-verification",
