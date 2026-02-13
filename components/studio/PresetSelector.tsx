@@ -68,9 +68,13 @@ export function PresetSelector({
     {},
   );
 
+  // If there's a beat loaded and the preset is vocal‑focused, gently
+  // remind the user how the chain behaves without implying the beat
+  // is untouched. All MIXSMVRT presets will still shape the beat to
+  // make space for the vocal.
   const warningText =
     hasBeatTrack && selected.target === "vocal"
-      ? "Current preset is tuned for vocals. For stereo beats, try a Beat preset such as 'Minimal Beat Processing'."
+      ? "This preset focuses on vocals and will also shape the beat to make space for them."
       : null;
 
   return (
