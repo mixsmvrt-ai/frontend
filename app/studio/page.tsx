@@ -42,6 +42,11 @@ import {
   timeStretchAudioBufferSegment,
 } from "../../components/studio/tools/timeStretch";
 import { encodeWavFromAudioBuffer } from "../../components/studio/tools/wav";
+import {
+  mapVirtualTracksFromBackend,
+  type BackendVirtualTrack,
+  type VirtualMixerTrack,
+} from "../../lib/virtualTracks";
 
 export const dynamic = "force-dynamic";
 
@@ -1281,6 +1286,7 @@ function MixStudioInner() {
   const [zoom, setZoom] = useState(1.2);
   const [masterVolume, setMasterVolume] = useState(0.9);
   const [masterPlugins, setMasterPlugins] = useState<TrackPlugin[]>([]);
+  const [virtualMixerTracks, setVirtualMixerTracks] = useState<VirtualMixerTrack[]>([]);
   const [trackLevels, setTrackLevels] = useState<Record<string, number>>({});
   const [playheadSeconds, setPlayheadSeconds] = useState(0);
   const [gridResolution, setGridResolution] = useState<"1/2" | "1/4" | "1/8">("1/4");
@@ -2136,6 +2142,7 @@ function MixStudioInner() {
       plugin_chain?: unknown;
       intelligent_analysis?: any;
       intelligent_plugin_chain?: any;
+      virtual_tracks?: BackendVirtualTrack[] | null;
     } = await response.json();
 
     if (data.status !== "processed") {
@@ -2174,6 +2181,13 @@ function MixStudioInner() {
       selectedPreset?.id ?? null,
     );
 
+    if (data.virtual_tracks && Array.isArray(data.virtual_tracks)) {
+      const mapped = mapVirtualTracksFromBackend(data.virtual_tracks);
+      if (mapped.length) {
+        setVirtualMixerTracks(mapped);
+      }
+    }
+
     return {
       file: processedFile,
       urls: {
@@ -2191,6 +2205,10 @@ function MixStudioInner() {
 
     // Capture the current mix so it can be restored via Undo.
     pushUndoSnapshot();
+
+  // Clear any previous virtual mixer buses; a new run will
+  // repopulate them from the latest DSP response.
+  setVirtualMixerTracks([]);
 
     // Reset any previous cancellation signal.
     processingCancelRef.current = false;
@@ -3680,6 +3698,29 @@ function MixStudioInner() {
                   }}
                 />
               </div>
+              {virtualMixerTracks.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {virtualMixerTracks.map((vt) => (
+                    <div key={vt.id} className="w-64">
+                      <div className="mb-1 text-[11px] font-medium text-white/60">
+                        {vt.name}
+                      </div>
+                      <TrackPluginRack
+                        plugins={vt.plugins}
+                        hidePlugins={false}
+                        onChange={(next) => {
+                          setVirtualMixerTracks((prev) =>
+                            prev.map((t) => (t.id === vt.id ? { ...t, plugins: next } : t)),
+                          );
+                        }}
+                        onOpen={(plugin) => {
+                          openPluginWindow(vt.id, plugin.id);
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -3870,9 +3911,13 @@ function MixStudioInner() {
       {openPluginEditors.map((ref, index) => {
         const isMasterBus = ref.trackId === "master-bus";
         const track = isMasterBus ? null : tracks.find((t) => t.id === ref.trackId);
+        const virtualTrack = !isMasterBus && !track
+          ? virtualMixerTracks.find((t) => t.id === ref.trackId)
+          : null;
         const plugin = isMasterBus
           ? masterPlugins.find((p) => p.id === ref.pluginId)
-          : track?.plugins?.find((p) => p.id === ref.pluginId);
+          : track?.plugins?.find((p) => p.id === ref.pluginId) ??
+            virtualTrack?.plugins.find((p) => p.id === ref.pluginId);
         if (!plugin) return null;
         const windowId = `${ref.trackId}:${ref.pluginId}`;
         const pos = pluginWindowPositions[windowId] ?? { x: 24 + index * 16, y: 24 + index * 16 };
@@ -3897,6 +3942,17 @@ function MixStudioInner() {
                       ? {
                           ...t,
                           plugins: (t.plugins || []).map((p) => (p.id === plugin.id ? next : p)),
+                        }
+                      : t,
+                  ),
+                );
+              } else if (virtualTrack) {
+                setVirtualMixerTracks((prev) =>
+                  prev.map((t) =>
+                    t.id === virtualTrack.id
+                      ? {
+                          ...t,
+                          plugins: t.plugins.map((p) => (p.id === plugin.id ? next : p)),
                         }
                       : t,
                   ),
