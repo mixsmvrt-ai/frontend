@@ -606,6 +606,7 @@ function buildAIPluginsForTrack(
     let busGluePreset: string;
     let limPreset: string;
     let stereoPreset: string;
+    let beatSubEqPreset: string;
 
     switch (flavour) {
       case "trap_dh":
@@ -617,6 +618,7 @@ function buildAIPluginsForTrack(
         busGluePreset = "bus_glue_punch";
         limPreset = "lim_loud";
         stereoPreset = "stereo_safe";
+        beatSubEqPreset = "eq_sub_trap_dh";
         break;
       case "afrobeat":
         subMeqPreset = "meq_warm";
@@ -625,6 +627,7 @@ function buildAIPluginsForTrack(
         busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
+        beatSubEqPreset = "eq_sub_afrobeat";
         break;
       case "rnb":
         subMeqPreset = "meq_warm";
@@ -633,6 +636,7 @@ function buildAIPluginsForTrack(
         busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
+        beatSubEqPreset = "eq_sub_rnb";
         break;
       case "reggae":
         subMeqPreset = "meq_warm";
@@ -641,6 +645,7 @@ function buildAIPluginsForTrack(
         busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_mono_check";
+        beatSubEqPreset = "eq_sub_reggae";
         break;
       case "dancehall":
         subMeqPreset = "meq_warm";
@@ -649,6 +654,7 @@ function buildAIPluginsForTrack(
         busGluePreset = "bus_glue_punch";
         limPreset = "lim_loud";
         stereoPreset = "stereo_safe";
+        beatSubEqPreset = "eq_sub_trap_dh";
         break;
       default:
         subMeqPreset = "meq_warm";
@@ -657,6 +663,7 @@ function buildAIPluginsForTrack(
         busGluePreset = "bus_glue_gentle";
         limPreset = "lim_streaming";
         stereoPreset = "stereo_safe";
+        beatSubEqPreset = "eq_sub_generic";
         break;
     }
 
@@ -765,11 +772,11 @@ function buildAIPluginsForTrack(
     }
 
     // For mix-only and mix+master Studio flows, keep beat
-    // processing light: just open the beat a little with EQ
-    // instead of showing a full mastering-style bus chain.
+    // processing light: show a single subtractive EQ instead
+    // of a full mastering-style bus chain.
     if (featureType === "mixing_only" || featureType === "mix_master") {
       plugins.push(
-        createPlugin("Mastering EQ", addMeqPreset, "AI Beat EQ", 0),
+        createPlugin("EQ", beatSubEqPreset, "AI Beat Subtractive EQ", 0),
       );
       return plugins;
     }
