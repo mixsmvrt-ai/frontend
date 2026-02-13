@@ -1642,9 +1642,13 @@ function MixStudioInner() {
           }
         }
 
-        // When mixing or mastering a beat-only session, only show Beat presets.
+        // When mixing or mastering a beat-only session, prefer Beat presets,
+        // but fall back to the full list so the selector never disappears.
         if ((presetMode === "mixing_only" || presetMode === "mastering_only") && hasBeatOnly) {
-          filtered = filtered.filter((p) => p.target === "beat");
+          const beatPresets = filtered.filter((p) => p.target === "beat");
+          if (beatPresets.length > 0) {
+            filtered = beatPresets;
+          }
         }
 
         setAvailablePresets(filtered);
