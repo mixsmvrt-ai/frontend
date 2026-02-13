@@ -1,10 +1,7 @@
 "use client";
 
-import type { TrackPlugin } from "../components/studio/pluginTypes";
-import {
-  defaultPluginParams,
-  type PluginType,
-} from "../components/studio/pluginTypes";
+import type { PluginParams, TrackPlugin } from "../components/studio/pluginTypes";
+import { defaultPluginParams, type PluginType } from "../components/studio/pluginTypes";
 
 /**
  * Shape coming back from the DSP backend in result.virtual_tracks.
@@ -82,23 +79,45 @@ export function mapVirtualTracksFromBackend(
       vt.plugins?.map((p, index) => {
         const pluginType = inferPluginType(vt, p.plugin);
 
-        return {
+        // Merge backend params into the default shape, but clamp the
+        // value types into PluginParams (number | string | boolean | number[]).
+        const backendParams = p.params ?? {};
+        const safeBackendParams: PluginParams = Object.fromEntries(
+          Object.entries(backendParams).map(([key, value]) => {
+            if (
+              typeof value === "number" ||
+              typeof value === "string" ||
+              typeof value === "boolean" ||
+              Array.isArray(value)
+            ) {
+              return [key, value];
+            }
+            // Drop unsupported types to keep the UI safe.
+            return [key, undefined];
+          }),
+        ) as PluginParams;
+
+        const params: PluginParams = {
+          ...defaultPluginParams(pluginType),
+          ...safeBackendParams,
+        };
+
+        const plugin: TrackPlugin = {
           id: `${vt.id}::${index}`,
           pluginId: p.plugin,
           trackId: vt.id,
           pluginType,
           name: vt.name.includes("Bus") ? vt.name : pluginType,
           order: index,
-          params: {
-            ...defaultPluginParams(pluginType),
-            ...p.params,
-          },
+          params,
           aiParams: undefined,
           preset: undefined,
           enabled: true,
           aiGenerated: false,
           locked: true,
-        } satisfies TrackPlugin;
+        };
+
+        return plugin;
       }) ?? [];
 
     const sends =
@@ -106,7 +125,7 @@ export function mapVirtualTracksFromBackend(
         sourceTrackId: r.source,
         targetTrackId: vt.id,
         level: typeof r.send_level === "number" ? r.send_level : 1,
-        type: r.send_type === "pre-fader" ? "pre-fader" : "post-fader",
+        type: r.send_type === "pre-fader" ? ("pre-fader" as const) : ("post-fader" as const),
       })) ?? [];
 
     mixerTracks.push({
