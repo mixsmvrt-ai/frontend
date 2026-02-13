@@ -2071,6 +2071,13 @@ function MixStudioInner() {
     formData.append("track_type", trackType);
     formData.append("preset", presetName);
 
+    // If this Studio preset is wired to a concrete vocal preset
+    // profile in the DSP catalog, pass it through so the engine can
+    // select that exact "vibe" instead of a default for the genre.
+    if (trackType === "vocal" && selectedPreset?.vocal_preset_id) {
+      formData.append("vocal_preset", selectedPreset.vocal_preset_id);
+    }
+
     // Hint DSP about the processing target so it can apply beat-safe logic
     const target: "vocal" | "beat" | "full_mix" =
       trackType === "vocal" ? "vocal" : trackType === "beat" ? "beat" : "full_mix";
