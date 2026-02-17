@@ -1379,6 +1379,7 @@ function MixStudioInner() {
 
   const { backend: backendJobStatus, ui: processingJobUi } = useProcessingJob(activeJobId, {
     flow: (featureForMode as FlowKey | null) ?? null,
+    userId,
     presetLabelContext:
       selectedPresetMeta && featureForMode
         ? {
@@ -2042,8 +2043,6 @@ function MixStudioInner() {
   ): Promise<ProcessedTrackResult | null> => {
     if (!track.file) return null;
 
-    const formData = new FormData();
-
     let trackType: "vocal" | "beat" | "master" = "vocal";
     if (options?.forceMaster) {
       trackType = "master";
@@ -2067,116 +2066,129 @@ function MixStudioInner() {
       }
     }
 
-    formData.append("file", track.file);
-    formData.append("track_type", trackType);
-    formData.append("preset", presetName);
-
-    // If this Studio preset is wired to a concrete vocal preset
-    // profile in the DSP catalog, pass it through so the engine can
-    // select that exact "vibe" instead of a default for the genre.
-    if (trackType === "vocal" && selectedPreset?.vocal_preset_id) {
-      formData.append("vocal_preset", selectedPreset.vocal_preset_id);
-    }
-
-    // Hint DSP about the processing target so it can apply beat-safe logic
-    const target: "vocal" | "beat" | "full_mix" =
-      trackType === "vocal" ? "vocal" : trackType === "beat" ? "beat" : "full_mix";
-    formData.append("target", target);
-
-    if (trackType === "vocal") {
-      const gender = track.gender || "male";
-      formData.append("gender", gender);
-
-      const currentMode = studioMode;
-      if (
-        (currentMode === "mix-only" || currentMode === "mix-master") &&
-        throwFxMode &&
-        throwFxMode !== "off"
-      ) {
-        formData.append("throw_fx_mode", throwFxMode);
-      }
-    }
+    const effectiveUserId = (userId && userId.trim().length > 0) ? userId : "studio-anon";
 
     const genreKey = GENRE_TO_DSP_KEY[genre];
     const currentFeatureType = featureTypeForMode(studioMode) ?? null;
-    const isBgOrAdlibVocal =
-      trackType === "vocal" && (track.role === "background" || track.role === "adlib");
+    const requestedContentType = track.file.type && track.file.type.trim().length > 0
+      ? track.file.type
+      : "audio/wav";
 
-    // For lead vocals and non-vocal tracks, keep sending the genre so the
-    // DSP can route to the main genre chain. For background/adlib vocals,
-    // we let the ``preset`` name (with _bg/_adlib suffix) drive routing so
-    // they can use dedicated chains.
-    if (genreKey && !isBgOrAdlibVocal) {
-      formData.append("genre", genreKey);
-    }
-
-    if (referenceProfile) {
-      formData.append(
-        "reference_profile",
-        JSON.stringify({ preset_overrides: referenceProfile }),
-      );
-    }
-    // Thread the studio's musical key/scale through to the DSP so
-    // pitch correction can lock to the correct scale.
-    if (sessionKey) {
-      formData.append("session_key", sessionKey);
-    }
-    if (sessionScale) {
-      formData.append("session_scale", sessionScale);
-    }
-
-    // Thread the current plugin chain through to the DSP engine so
-    // offline renders can eventually honour the user's knob tweaks
-    // instead of relying solely on the high-level preset name.
-    if (Array.isArray(track.plugins) && track.plugins.length > 0) {
-      const pluginChain = track.plugins.map((p) => ({
-        pluginType: p.pluginType,
-        params: p.params,
-        enabled: p.enabled,
-        order: p.order,
-        aiGenerated: p.aiGenerated,
-      }));
-      try {
-        formData.append("plugin_chain", JSON.stringify(pluginChain));
-      } catch {
-        // If serialization fails, skip sending plugin_chain rather than
-        // breaking the processing request.
-      }
-    }
-    const response = await fetch(`${DSP_URL}/process`, {
+    // 1) Ask backend for a presigned upload URL and stable S3 key.
+    const uploadInitRes = await fetch(`${BACKEND_URL}/generate-upload-url`, {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: effectiveUserId,
+        filename: track.file.name || `${track.id}.wav`,
+        content_type: requestedContentType,
+        file_size_bytes: track.file.size,
+      }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || "Failed to process audio with DSP service");
+    if (!uploadInitRes.ok) {
+      const txt = await uploadInitRes.text();
+      throw new Error(txt || "Failed to generate S3 upload URL");
     }
 
-    const data: {
-      status?: string;
-      output_file?: string | null;
-      output_files?: { wav?: string | null; mp3?: string | null };
-      track_type?: string;
-      preset?: string;
-      plugin_chain?: unknown;
-      intelligent_analysis?: any;
-      intelligent_plugin_chain?: any;
-      virtual_tracks?: BackendVirtualTrack[] | null;
-    } = await response.json();
+    const uploadInit = (await uploadInitRes.json()) as {
+      upload_url: string;
+      s3_key: string;
+    };
 
-    if (data.status !== "processed") {
-      return null;
+    // 2) Upload original audio directly to S3.
+    const putRes = await fetch(uploadInit.upload_url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": requestedContentType,
+      },
+      body: track.file,
+    });
+
+    if (!putRes.ok) {
+      throw new Error("Failed to upload audio to S3");
     }
 
-    const rawWav = data.output_files?.wav ?? data.output_file;
-    if (!rawWav) {
-      return null;
+    // 3) Create an async processing job backed by S3 IO.
+    const flowType: FeatureType = options?.forceMaster
+      ? "mastering_only"
+      : (currentFeatureType ?? "mixing_only");
+
+    const createJobRes = await fetch(`${BACKEND_URL}/create-job`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: effectiveUserId,
+        s3_key: uploadInit.s3_key,
+        genre: genreKey ?? null,
+        flow_type: flowType,
+        preset_name: presetName,
+      }),
+    });
+
+    if (!createJobRes.ok) {
+      const txt = await createJobRes.text();
+      throw new Error(txt || "Failed to create processing job");
     }
 
-    const wavUrl = rawWav.startsWith("http") ? rawWav : `${DSP_URL}${rawWav}`;
-    const rawMp3 = data.output_files?.mp3 ?? null;
-    const mp3Url = rawMp3 ? (rawMp3.startsWith("http") ? rawMp3 : `${DSP_URL}${rawMp3}`) : null;
+    const jobPayload = (await createJobRes.json()) as { job_id: string };
+    const jobId = jobPayload.job_id;
+    setActiveJobId(jobId);
+
+    // 4) Poll job status until complete and retrieve output URL.
+    const pollStart = Date.now();
+    const maxWaitMs = 20 * 60 * 1000;
+    const pollEveryMs = 2500;
+
+    let outputDownloadUrl: string | null = null;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      if (processingCancelRef.current) {
+        return null;
+      }
+
+      if (Date.now() - pollStart > maxWaitMs) {
+        throw new Error("Processing timed out");
+      }
+
+      const statusRes = await fetch(
+        `${BACKEND_URL}/job/${encodeURIComponent(jobId)}?user_id=${encodeURIComponent(effectiveUserId)}`,
+      );
+      if (!statusRes.ok) {
+        const txt = await statusRes.text();
+        throw new Error(txt || "Failed to fetch job status");
+      }
+
+      const statusData = (await statusRes.json()) as {
+        status: "pending" | "processing" | "completed" | "failed";
+        output_download_url?: string | null;
+        error_message?: string | null;
+      };
+
+      if (statusData.status === "completed") {
+        outputDownloadUrl = statusData.output_download_url ?? null;
+        break;
+      }
+
+      if (statusData.status === "failed") {
+        throw new Error(statusData.error_message || "DSP processing job failed");
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, pollEveryMs));
+    }
+
+    if (!outputDownloadUrl) {
+      throw new Error("Missing output download URL from completed job");
+    }
+
+    const wavUrl = outputDownloadUrl;
+    const mp3Url: string | null = null;
 
     const outResp = await fetch(wavUrl);
     if (!outResp.ok) {
@@ -2201,13 +2213,6 @@ function MixStudioInner() {
       selectedPreset?.id ?? null,
     );
 
-    if (data.virtual_tracks && Array.isArray(data.virtual_tracks)) {
-      const mapped = mapVirtualTracksFromBackend(data.virtual_tracks);
-      if (mapped.length) {
-        setVirtualMixerTracks(mapped);
-      }
-    }
-
     return {
       file: processedFile,
       urls: {
@@ -2215,7 +2220,8 @@ function MixStudioInner() {
         mp3: mp3Url,
       },
       plugins: aiPlugins,
-      intelligentAnalysis: data.intelligent_analysis,
+      intelligentAnalysis: null,
+      intelligentPluginChain: null,
     };
   };
 
@@ -2329,106 +2335,9 @@ function MixStudioInner() {
     // Seed overlay with the flow-specific stages immediately.
     setOverlayStages(flowStages);
 
-    // Kick off a backend processing job so the overlay can track
-    // real step-based progress via /status/{job_id}. This currently
-    // drives Supabase job rows and the UI, while the DSP service
-    // handles the actual per-track processing below.
-    try {
-      const selectedPresetMeta =
-        availablePresets.find((p) => p.id === selectedPresetId) ??
-        availablePresets[0] ??
-        null;
-
-      const backendTarget: "vocal" | "beat" | "full_mix" =
-        (selectedPresetMeta?.target as "vocal" | "beat" | "full_mix" | undefined) ||
-        "full_mix";
-
-      const payload = {
-        user_id: userId,
-        feature_type: featureType,
-        job_type: jobType,
-        preset_id: selectedPresetId,
-        target: backendTarget,
-        input_files: {
-          _meta: {
-            display_name: "Studio session mix",
-          },
-        },
-      };
-
-      const res = await fetch(`${BACKEND_URL}/process`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        const data = (await res.json()) as {
-          id: string;
-          steps?: { name: string; completed: boolean }[];
-        };
-        setActiveJobId(data.id);
-        if (data.steps && data.steps.length) {
-          const dynamicStages: ProcessingStage[] = data.steps.map((s) => ({
-            id: s.name,
-            label: s.name,
-          }));
-          setOverlayStages(dynamicStages);
-        }
-
-        // Throttle DSP load across users by waiting until this job is
-        // at the front of the queue for its feature_type before
-        // starting the per-track DSP processing loop below.
-        if (featureType && data.id) {
-          try {
-            const maxWaitMs = 10 * 60 * 1000; // safety: 10 minutes
-            const pollIntervalMs = 2000;
-            const start = Date.now();
-
-            // eslint-disable-next-line no-constant-condition
-            while (true) {
-              if (processingCancelRef.current) break;
-              if (Date.now() - start > maxWaitMs) break;
-
-              const statusRes = await fetch(`${BACKEND_URL}/status/${data.id}`);
-              if (!statusRes.ok) break;
-
-              const statusJson = (await statusRes.json()) as {
-                status: string;
-                queue_position?: number | null;
-                queue_size?: number | null;
-              };
-
-              if (statusJson.status === "failed" || statusJson.status === "completed") {
-                break;
-              }
-
-              const pos = statusJson.queue_position ?? null;
-              const size = statusJson.queue_size ?? null;
-
-              if (pos === 1 || !size || size <= 1) {
-                // We are at the front of the line (or effectively alone).
-                break;
-              }
-
-              await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-            }
-          } catch {
-            // If queue polling fails, fall through and continue processing.
-          }
-        }
-      } else {
-        // eslint-disable-next-line no-console
-        console.error("Failed to create backend processing job", await res.text());
-        setActiveJobId(null);
-      }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error("Error creating backend processing job", error);
-      setActiveJobId(null);
-    }
+    // In S3 job mode, each track creates/owns its own async processing
+    // job; the active job id is assigned inside processTrackWithAI.
+    setActiveJobId(null);
 
     try {
       const updates = new Map<string, ProcessedTrackResult>();
@@ -2594,6 +2503,7 @@ function MixStudioInner() {
       );
     } finally {
       setIsProcessing(false);
+      setActiveJobId(null);
       setProcessingOverlay((prev) => prev);
     }
   };
