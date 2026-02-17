@@ -129,7 +129,6 @@ export function useBackendJobStatus(
       isActive = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [jobId, pollIntervalMs, onComplete, onError]);
   }, [jobId, pollIntervalMs, userId, onComplete, onError]);
 
   return status;
