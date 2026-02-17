@@ -40,6 +40,7 @@ export interface ProcessingJobState {
 
 interface UseProcessingJobOptions {
   flow: FlowKey | null;
+  userId?: string | null;
   presetLabelContext?: PresetLabelContext | null;
   pollIntervalMs?: number;
   onComplete?: (status: BackendJobStatus) => void;
@@ -54,10 +55,11 @@ export function useProcessingJob(
   jobId: string | null,
   options: UseProcessingJobOptions,
 ): { backend: BackendJobStatus | null; ui: ProcessingJobState } {
-  const { flow, presetLabelContext, pollIntervalMs, onComplete, onError } = options;
+  const { flow, userId, presetLabelContext, pollIntervalMs, onComplete, onError } = options;
 
   const backendStatus = useBackendJobStatus(jobId, {
     pollIntervalMs,
+    userId,
     onComplete,
     onError,
   });
@@ -66,6 +68,7 @@ export function useProcessingJob(
     const phase: ProcessingJobPhase = (() => {
       if (!jobId) return "idle";
       if (!backendStatus) return "queued";
+      if (backendStatus.status === "pending") return "queued";
       return backendStatus.status;
     })();
 
