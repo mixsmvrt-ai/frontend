@@ -123,6 +123,7 @@ type StudioSnapshot = {
 
 const DSP_URL = process.env.NEXT_PUBLIC_DSP_URL || "http://localhost:8001";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+const STUDIO_API_BASE = "/api/studio";
 const MAX_HISTORY = 20;
 
 function uploadWithProgress(
@@ -132,6 +133,7 @@ function uploadWithProgress(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    xhr.timeout = 120000;
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -149,6 +151,8 @@ function uploadWithProgress(
     };
 
     xhr.onerror = () => reject(new Error("S3 upload failed"));
+    xhr.ontimeout = () => reject(new Error("S3 upload timed out"));
+    xhr.onabort = () => reject(new Error("S3 upload aborted"));
 
     xhr.open("PUT", uploadUrl);
     xhr.setRequestHeader("Content-Type", file.type || "audio/wav");
@@ -1797,7 +1801,7 @@ function MixStudioInner() {
 
     try {
       // Step 1: request presigned upload URL.
-      const res = await fetch(`${BACKEND_URL}/generate-upload-url`, {
+      const res = await fetch(`${STUDIO_API_BASE}/generate-upload-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1853,6 +1857,15 @@ function MixStudioInner() {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Track upload failed", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Upload failed. Check backend and S3 CORS configuration.";
+      // eslint-disable-next-line no-console
+      console.error("Upload diagnostics:", {
+        backendProxy: `${STUDIO_API_BASE}/generate-upload-url`,
+        message,
+      });
       setTracks((prev) =>
         prev.map((track) =>
           track.id === trackId
