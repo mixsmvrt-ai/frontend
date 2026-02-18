@@ -1374,6 +1374,19 @@ export default function TrackLane({
     onPanChange(track.id, asUnit);
   };
 
+  const uploadStatus = track.upload_status ?? (track.s3_key ? "uploaded" : "idle");
+  const uploadProgress = Math.max(0, Math.min(100, track.upload_progress ?? 0));
+  const canProcessTrack = Boolean(track.s3_key) && uploadStatus === "uploaded";
+
+  const uploadStatusLabel =
+    uploadStatus === "uploading"
+      ? `Uploading ${Math.round(uploadProgress)}%`
+      : uploadStatus === "uploaded"
+        ? "Uploaded"
+        : uploadStatus === "failed"
+          ? "Upload failed"
+          : "Not uploaded";
+
   return (
     <div
       className={`relative flex border-b bg-black/40 transition-colors ${
@@ -1591,13 +1604,32 @@ export default function TrackLane({
               onProcess(track.id);
             }}
             className="inline-flex items-center rounded bg-red-600 px-2 py-1 text-[10px] font-semibold text-white shadow-[0_0_10px_rgba(248,113,113,0.7)] hover:bg-red-500 disabled:opacity-60"
-            disabled={!track.file}
+            disabled={!canProcessTrack}
           >
             Re-render
           </button>
           <span className="truncate text-[10px] text-white/40">
             {track.file ? track.file.name : "Drop audio here"}
           </span>
+        </div>
+
+        <div className="mt-1 space-y-1">
+          <div className="flex items-center justify-between text-[10px] text-white/50">
+            <span>S3 Upload</span>
+            <span>{uploadStatusLabel}</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded bg-zinc-800">
+            <div
+              className={`h-full transition-all ${
+                uploadStatus === "failed"
+                  ? "bg-red-500"
+                  : uploadStatus === "uploaded"
+                    ? "bg-emerald-500"
+                    : "bg-red-400"
+              }`}
+              style={{ width: `${uploadStatus === "uploaded" ? 100 : uploadProgress}%` }}
+            />
+          </div>
         </div>
 
         {/* Per-track plugin rack under level / faders */}
