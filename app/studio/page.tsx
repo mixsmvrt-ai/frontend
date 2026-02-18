@@ -66,6 +66,10 @@ export type TrackType = {
   pan?: number; // -1 (L) to 1 (R)
   gender?: "male" | "female";
   file?: File;
+  s3_key?: string | null;
+  local_preview_url?: string | null;
+  upload_status?: "idle" | "uploading" | "uploaded" | "failed";
+  upload_progress?: number;
   muted?: boolean;
   solo?: boolean;
   // Visually indicate that this track's audio has been processed/mastered.
@@ -120,6 +124,37 @@ type StudioSnapshot = {
 const DSP_URL = process.env.NEXT_PUBLIC_DSP_URL || "http://localhost:8001";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const MAX_HISTORY = 20;
+
+function uploadWithProgress(
+  uploadUrl: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = (event.loaded / event.total) * 100;
+        onProgress?.(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      reject(new Error(`S3 upload failed with status ${xhr.status}`));
+    };
+
+    xhr.onerror = () => reject(new Error("S3 upload failed"));
+
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", file.type || "audio/wav");
+    xhr.send(file);
+  });
+}
 
 function applyAutoMixBalanceForMixMaster(tracks: TrackType[]): TrackType[] {
   if (!tracks.length) return tracks;
@@ -1738,20 +1773,99 @@ function MixStudioInner() {
     setPlayheadSeconds(currentTime);
   }, [currentTime]);
 
-  const handleFileSelected = useCallback((trackId: string, file: File) => {
+  const handleFileSelected = useCallback(async (trackId: string, file: File) => {
+    const effectiveUserId = (userId && userId.trim().length > 0) ? userId : "studio-anon";
+    const contentType = file.type && file.type.trim().length > 0 ? file.type : "audio/wav";
+    const localPreviewUrl = URL.createObjectURL(file);
+
+    // Seed local preview immediately while upload runs.
     setTracks((prev) =>
       prev.map((track) =>
         track.id === trackId
           ? {
               ...track,
               file,
-              // New upload resets any previous processed state.
+              local_preview_url: localPreviewUrl,
+              s3_key: null,
+              upload_status: "uploading",
+              upload_progress: 0,
               processed: false,
             }
           : track,
       ),
     );
-  }, []);
+
+    try {
+      // Step 1: request presigned upload URL.
+      const res = await fetch(`${BACKEND_URL}/generate-upload-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: effectiveUserId,
+          filename: file.name,
+          content_type: contentType,
+          file_size_bytes: file.size,
+        }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || "Failed to request upload URL");
+      }
+
+      const { upload_url, s3_key } = (await res.json()) as {
+        upload_url: string;
+        s3_key: string;
+      };
+
+      console.log("Uploading to S3...");
+
+      // Step 2: upload file directly to S3.
+      await uploadWithProgress(upload_url, file, (percent) => {
+        setTracks((prev) =>
+          prev.map((track) =>
+            track.id === trackId
+              ? {
+                  ...track,
+                  upload_status: "uploading",
+                  upload_progress: Math.max(0, Math.min(100, percent)),
+                }
+              : track,
+          ),
+        );
+      });
+
+      console.log("S3 key:", s3_key);
+
+      // Step 3: persist s3_key in track state.
+      setTracks((prev) =>
+        prev.map((track) =>
+          track.id === trackId
+            ? {
+                ...track,
+                s3_key,
+                upload_status: "uploaded",
+                upload_progress: 100,
+              }
+            : track,
+        ),
+      );
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Track upload failed", error);
+      setTracks((prev) =>
+        prev.map((track) =>
+          track.id === trackId
+            ? {
+                ...track,
+                upload_status: "failed",
+                upload_progress: 0,
+              }
+            : track,
+        ),
+      );
+    }
+  }, [userId]);
 
   // Keep the processing overlay in sync with backend job progress & steps
   useEffect(() => {
@@ -1880,6 +1994,10 @@ function MixStudioInner() {
           volume: 0.9,
           pan: 0,
           gender: "male" as const,
+          s3_key: null,
+          local_preview_url: null,
+          upload_status: "idle" as const,
+          upload_progress: 0,
           muted: false,
           solo: false,
         },
@@ -2006,6 +2124,10 @@ function MixStudioInner() {
           ? {
               ...track,
               file: undefined,
+              s3_key: null,
+              local_preview_url: null,
+              upload_status: "idle",
+              upload_progress: 0,
               processed: false,
             }
           : track,
@@ -2041,7 +2163,9 @@ function MixStudioInner() {
     track: TrackType,
     options?: { forceMaster?: boolean },
   ): Promise<ProcessedTrackResult | null> => {
-    if (!track.file) return null;
+    if (!track.s3_key) {
+      throw new Error("Track not uploaded yet.");
+    }
 
     let trackType: "vocal" | "beat" | "master" = "vocal";
     if (options?.forceMaster) {
@@ -2070,48 +2194,7 @@ function MixStudioInner() {
 
     const genreKey = GENRE_TO_DSP_KEY[genre];
     const currentFeatureType = featureTypeForMode(studioMode) ?? null;
-    const requestedContentType = track.file.type && track.file.type.trim().length > 0
-      ? track.file.type
-      : "audio/wav";
-
-    // 1) Ask backend for a presigned upload URL and stable S3 key.
-    const uploadInitRes = await fetch(`${BACKEND_URL}/generate-upload-url`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: effectiveUserId,
-        filename: track.file.name || `${track.id}.wav`,
-        content_type: requestedContentType,
-        file_size_bytes: track.file.size,
-      }),
-    });
-
-    if (!uploadInitRes.ok) {
-      const txt = await uploadInitRes.text();
-      throw new Error(txt || "Failed to generate S3 upload URL");
-    }
-
-    const uploadInit = (await uploadInitRes.json()) as {
-      upload_url: string;
-      s3_key: string;
-    };
-
-    // 2) Upload original audio directly to S3.
-    const putRes = await fetch(uploadInit.upload_url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": requestedContentType,
-      },
-      body: track.file,
-    });
-
-    if (!putRes.ok) {
-      throw new Error("Failed to upload audio to S3");
-    }
-
-    // 3) Create an async processing job backed by S3 IO.
+    // Create an async processing job backed by S3 IO.
     const flowType: FeatureType = options?.forceMaster
       ? "mastering_only"
       : (currentFeatureType ?? "mixing_only");
@@ -2123,7 +2206,7 @@ function MixStudioInner() {
       },
       body: JSON.stringify({
         user_id: effectiveUserId,
-        s3_key: uploadInit.s3_key,
+        s3_key: track.s3_key,
         genre: genreKey ?? null,
         flow_type: flowType,
         preset_name: presetName,
@@ -2227,7 +2310,13 @@ function MixStudioInner() {
 
   const handleProcessFullMix = async () => {
     if (isProcessing) return;
-    if (!tracks.some((track) => track.file)) return;
+    if (!tracks.some((track) => track.s3_key)) return;
+
+    const notUploaded = tracks.find((track) => (track.file || track.s3_key) && !track.s3_key);
+    if (notUploaded) {
+      window.alert("Track not uploaded yet.");
+      return;
+    }
 
     // Capture the current mix so it can be restored via Undo.
     pushUndoSnapshot();
@@ -2255,7 +2344,7 @@ function MixStudioInner() {
     }));
     const initialStageId = (flowStages[0] ?? { id: "processing" }).id;
 
-    const playable = tracks.filter((track) => track.file);
+    const playable = tracks.filter((track) => !!track.s3_key);
 
     // Enforce a musically sensible processing order so that the engine
     // always starts from the beat bed, then the main vocal, then
