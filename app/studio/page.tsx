@@ -1685,7 +1685,7 @@ function MixStudioInner() {
     }
 
     const controller = new AbortController();
-    fetch(`${BACKEND_URL}/studio/presets?mode=${presetMode}`, {
+    fetch(`${STUDIO_API_BASE}/presets?mode=${encodeURIComponent(presetMode)}`, {
       signal: controller.signal,
     })
       .then(async (res) => {
