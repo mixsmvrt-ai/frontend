@@ -49,59 +49,63 @@ export function useBackendJobStatus(
 
     const poll = async () => {
       try {
-        // Prefer legacy detailed /status endpoint when available, but
-        // fall back to S3 job endpoint (/job/{id}) for the new async flow.
         let data: BackendJobStatus | null = null;
 
-        const legacyRes = await fetch(`${BACKEND_URL}/status/${jobId}`);
-        if (legacyRes.ok) {
-          data = (await legacyRes.json()) as BackendJobStatus;
-        } else if (userId) {
+        // Prefer the durable S3/SQL job endpoint when we have a user_id.
+        // This avoids spurious 404s from the legacy Supabase /status route
+        // when the jobId comes from /create-job.
+        if (userId) {
           const s3Res = await fetch(
             `${BACKEND_URL}/job/${jobId}?user_id=${encodeURIComponent(userId)}`,
           );
-          if (!s3Res.ok) {
-            throw new Error(`Status request failed with ${s3Res.status}`);
+          if (s3Res.ok) {
+            const s3Data = (await s3Res.json()) as {
+              status: "pending" | "processing" | "completed" | "failed";
+              output_download_url?: string | null;
+              error_message?: string | null;
+              queue_feature_type?: string | null;
+              queue_position?: number | null;
+              queue_size?: number | null;
+            };
+
+            const progressByStatus: Record<string, number> = {
+              pending: 10,
+              processing: 65,
+              completed: 100,
+              failed: 100,
+            };
+
+            data = {
+              id: jobId,
+              status: s3Data.status,
+              progress: progressByStatus[s3Data.status] ?? 0,
+              current_stage:
+                s3Data.status === "pending"
+                  ? "Queued"
+                  : s3Data.status === "processing"
+                    ? "Processing"
+                    : s3Data.status === "completed"
+                      ? "Complete"
+                      : "Failed",
+              error_message: s3Data.error_message ?? null,
+              output_download_url: s3Data.output_download_url ?? null,
+              steps: null,
+              queue_feature_type: s3Data.queue_feature_type ?? null,
+              queue_position:
+                typeof s3Data.queue_position === "number" ? s3Data.queue_position : null,
+              queue_size: typeof s3Data.queue_size === "number" ? s3Data.queue_size : null,
+            };
           }
+        }
 
-          const s3Data = (await s3Res.json()) as {
-            status: "pending" | "processing" | "completed" | "failed";
-            output_download_url?: string | null;
-            error_message?: string | null;
-            queue_feature_type?: string | null;
-            queue_position?: number | null;
-            queue_size?: number | null;
-          };
-
-          const progressByStatus: Record<string, number> = {
-            pending: 10,
-            processing: 65,
-            completed: 100,
-            failed: 100,
-          };
-
-          data = {
-            id: jobId,
-            status: s3Data.status,
-            progress: progressByStatus[s3Data.status] ?? 0,
-            current_stage:
-              s3Data.status === "pending"
-                ? "Queued"
-                : s3Data.status === "processing"
-                  ? "Processing"
-                  : s3Data.status === "completed"
-                    ? "Complete"
-                    : "Failed",
-            error_message: s3Data.error_message ?? null,
-            output_download_url: s3Data.output_download_url ?? null,
-            steps: null,
-            queue_feature_type: s3Data.queue_feature_type ?? null,
-            queue_position:
-              typeof s3Data.queue_position === "number" ? s3Data.queue_position : null,
-            queue_size: typeof s3Data.queue_size === "number" ? s3Data.queue_size : null,
-          };
-        } else {
-          throw new Error(`Status request failed with ${legacyRes.status}`);
+        // Fall back to legacy detailed /status endpoint.
+        if (!data) {
+          const legacyRes = await fetch(`${BACKEND_URL}/status/${jobId}`);
+          if (legacyRes.ok) {
+            data = (await legacyRes.json()) as BackendJobStatus;
+          } else {
+            throw new Error(`Status request failed with ${legacyRes.status}`);
+          }
         }
 
         if (!data) {
