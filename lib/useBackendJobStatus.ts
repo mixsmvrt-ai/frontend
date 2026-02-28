@@ -68,6 +68,9 @@ export function useBackendJobStatus(
             status: "pending" | "processing" | "completed" | "failed";
             output_download_url?: string | null;
             error_message?: string | null;
+            queue_feature_type?: string | null;
+            queue_position?: number | null;
+            queue_size?: number | null;
           };
 
           const progressByStatus: Record<string, number> = {
@@ -92,6 +95,10 @@ export function useBackendJobStatus(
             error_message: s3Data.error_message ?? null,
             output_download_url: s3Data.output_download_url ?? null,
             steps: null,
+            queue_feature_type: s3Data.queue_feature_type ?? null,
+            queue_position:
+              typeof s3Data.queue_position === "number" ? s3Data.queue_position : null,
+            queue_size: typeof s3Data.queue_size === "number" ? s3Data.queue_size : null,
           };
         } else {
           throw new Error(`Status request failed with ${legacyRes.status}`);
