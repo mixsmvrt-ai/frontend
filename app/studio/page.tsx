@@ -1416,9 +1416,11 @@ function MixStudioInner() {
     [availablePresets, selectedPresetId],
   );
 
+  const effectiveUserId = (userId && userId.trim().length > 0) ? userId : "studio-anon";
+
   const { backend: backendJobStatus, ui: processingJobUi } = useProcessingJob(activeJobId, {
     flow: (featureForMode as FlowKey | null) ?? null,
-    userId,
+    userId: effectiveUserId,
     presetLabelContext:
       selectedPresetMeta && featureForMode
         ? {
