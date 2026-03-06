@@ -47,6 +47,11 @@ import {
   type BackendVirtualTrack,
   type VirtualMixerTrack,
 } from "../../lib/virtualTracks";
+import { requestAnalyzeMix } from "../../studio/audioEngine/trackProcessor";
+import {
+  buildTrackPluginsFromAnalysis,
+  mergeAiPluginsWithUserPlugins,
+} from "../../studio/audioEngine/pluginChain";
 
 export const dynamic = "force-dynamic";
 
@@ -112,8 +117,6 @@ type FeatureType =
   | "mixing_only"
   | "mix_master"
   | "mastering_only";
-
-type JobType = "mix" | "master" | "mix_master";
 
 type StudioSnapshot = {
   tracks: TrackType[];
@@ -224,13 +227,6 @@ function featureTypeForMode(mode: StudioMode): FeatureType | null {
   return null;
 }
 
-function jobTypeForFeature(featureType: FeatureType): JobType {
-  if (featureType === "mastering_only") return "master";
-  if (featureType === "mix_master") return "mix_master";
-  // For cleanup and mix-only flows, use mix
-  return "mix";
-}
-
 const GENRE_TO_DSP_KEY: Record<string, string> = {
   Dancehall: "dancehall",
   "Trap Dancehall": "trap_dancehall",
@@ -240,6 +236,15 @@ const GENRE_TO_DSP_KEY: Record<string, string> = {
   "R&B": "rnb",
   Reggae: "reggae",
 };
+
+function mapTrackRoleToAnalysisRole(
+  role: TrackType["role"],
+): "lead_vocal" | "background_vocal" | "beat" | "bass" | "melody" | "drums" {
+  if (role === "beat") return "beat";
+  if (role === "background" || role === "adlib") return "background_vocal";
+  if (role === "instrument") return "melody";
+  return "lead_vocal";
+}
 
 function buildAIPluginsForTrack(
   trackId: string,
@@ -2347,7 +2352,6 @@ function MixStudioInner() {
     setHasMixed(false);
 
     const featureType = featureTypeForMode(studioMode) ?? "mix_master";
-    const jobType = jobTypeForFeature(featureType);
 
     // Use the centralized flowSteps config to derive the initial
     // step list for this run, so the overlay can show meaningful
@@ -2444,151 +2448,76 @@ function MixStudioInner() {
     setActiveJobId(null);
 
     try {
-      const updates = new Map<string, ProcessedTrackResult>();
-      let anyUpdated = false;
+      const genreKey = GENRE_TO_DSP_KEY[genre] ?? genre?.toLowerCase() ?? null;
+      const analyzeTracks = orderedPlayable
+        .filter((track) => track.s3_key)
+        .map((track) => ({
+          track_id: track.id,
+          s3_key: track.s3_key,
+          role: mapTrackRoleToAnalysisRole(track.role),
+        }));
 
-      // Process each track that has audio through the AI DSP service,
-      // in the same role-based order used to seed the overlay.
-      const playableForLoop = (() => {
-        // Reconstruct the ordered list in case the closure-scope
-        // reference is lost; fall back to the raw playable list.
-        const rolePriority: Record<TrackType["role"], number> = {
-          beat: 0,
-          vocal: 1,
-          background: 2,
-          adlib: 3,
-          instrument: 4,
-        };
+      const analyzeResult = await requestAnalyzeMix(BACKEND_URL, {
+        tracks: analyzeTracks,
+        genre: genreKey,
+        preset: selectedPresetMeta?.id ?? null,
+      });
 
-        const orderIndex = new Map<string, number>(
-          playable.map((t, index) => [t.id, index]),
-        );
+      if (processingCancelRef.current) {
+        return;
+      }
 
-        const ordered = [...playable].sort((a, b) => {
-          const pa = rolePriority[a.role] ?? 99;
-          const pb = rolePriority[b.role] ?? 99;
-          if (pa !== pb) return pa - pb;
-          const ia = orderIndex.get(a.id) ?? 0;
-          const ib = orderIndex.get(b.id) ?? 0;
-          return ia - ib;
-        });
+      const byTrackId = new Map(analyzeResult.tracks.map((t) => [t.track_id, t]));
 
-        return ordered;
-      })();
+      setTracks((prev) => {
+        let next = prev.map((track) => {
+          const analyzed = byTrackId.get(track.id);
+          if (!analyzed) return track;
 
-      for (let index = 0; index < playableForLoop.length; index += 1) {
-        if (processingCancelRef.current) {
-          break;
-        }
-
-        const track = playableForLoop[index];
-
-        // Mark the per-track row as actively processing. Overall
-        // progress and step advancement are driven purely by the
-        // backend job status, not by this local loop.
-        setProcessingOverlay((prev): ProcessingOverlayState | null => {
-          if (!prev) return prev;
-          const updatedTracks: TrackProcessingStatus[] = prev.tracks.map((t) => {
-            if (t.id === track.id) {
-              return {
-                ...t,
-                state: "processing" as TrackProcessingStatus["state"],
-              };
-            }
-            return t;
-          });
+          const aiPlugins = buildTrackPluginsFromAnalysis(track.id, analyzed.plugins);
+          const mergedPlugins = mergeAiPluginsWithUserPlugins(track.plugins, aiPlugins, track.id);
 
           return {
-            ...prev,
-            tracks: updatedTracks,
+            ...track,
+            processed: true,
+            plugins: mergedPlugins,
           };
         });
 
-        // eslint-disable-next-line no-await-in-loop
-        const processed = await processTrackWithAI(track);
-        if (processed && !processingCancelRef.current) {
-          updates.set(track.id, processed);
-          anyUpdated = true;
-
-          const chain = processed.intelligentPluginChain as
-            | Array<{ plugin: string; params: any }>
-            | undefined
-            | null;
-          const summary =
-            chain && chain.length
-              ? chain
-                  .map((item) => (item && typeof item.plugin === "string" ? item.plugin : null))
-                  .filter((name) => !!name)
-                  .join(", ")
-              : null;
-
-          setProcessingOverlay((prev): ProcessingOverlayState | null => {
-            if (!prev) return prev;
-            const updatedTracks: TrackProcessingStatus[] = prev.tracks.map((t) => {
-              if (t.id === track.id) {
-                return {
-                  ...t,
-                  state: "completed" as TrackProcessingStatus["state"],
-                  detail: summary
-                    ? `DSP: ${summary}`
-                    : t.detail ?? null,
-                };
-              }
-              return t;
-            });
-            return {
-              ...prev,
-              tracks: updatedTracks,
-            };
-          });
+        if (studioMode === "mix-master" || studioMode === "mix-only") {
+          next = applyAutoMixBalanceForMixMaster(next);
         }
-      }
 
-      if (!processingCancelRef.current && updates.size > 0) {
-        setTracks((prev) => {
-          let next = prev.map((track) => {
-            const updated = updates.get(track.id);
-            if (!updated) return track;
+        return next;
+      });
 
-            let plugins = track.plugins;
-            if (updated.plugins && updated.plugins.length > 0) {
-              const existing = Array.isArray(track.plugins) ? track.plugins : [];
-              const userPlugins = existing.filter((p) => !p.aiGenerated);
-              const baseOrder = userPlugins.length;
-              const normalizedUser = userPlugins.map((p, index) => ({
-                ...p,
-                trackId: track.id,
-                order: index,
-              }));
-              const normalizedAI = updated.plugins.map((p, index) => ({
-                ...p,
-                trackId: track.id,
-                order: baseOrder + index,
-              }));
-              plugins = [...normalizedUser, ...normalizedAI];
-            }
+      setProcessingOverlay((prev): ProcessingOverlayState | null => {
+        if (!prev) return prev;
 
-            return {
-              ...track,
-              file: updated.file ?? track.file,
-              // Mark tracks whose audio has been updated by the AI
-              // pipeline so their waveforms can appear "bigger".
-              processed: true,
-              renderUrls: updated.urls ?? track.renderUrls,
-              plugins,
-            };
-          });
+        const completedTracks: TrackProcessingStatus[] = prev.tracks.map((track) => {
+          const analyzed = byTrackId.get(track.id);
+          if (!analyzed) return track;
 
-          // For mix & master and mix-only sessions, automatically rebalance
-          // background vocals and adlibs so they sit under and around the lead.
-          if (studioMode === "mix-master" || studioMode === "mix-only") {
-            next = applyAutoMixBalanceForMixMaster(next);
-          }
+          const summary = analyzed.plugins
+            .map((plugin) => plugin?.plugin)
+            .filter((name): name is string => typeof name === "string" && name.length > 0)
+            .join(", ");
 
-          return next;
+          return {
+            ...track,
+            state: "completed",
+            detail: summary ? `AI chain: ${summary}` : "AI chain configured",
+          };
         });
-      }
-      setHasMixed(!processingCancelRef.current && anyUpdated);
+
+        return {
+          ...prev,
+          percentage: 100,
+          tracks: completedTracks,
+        };
+      });
+
+      setHasMixed(byTrackId.size > 0);
       // Final overall progress and step completion are driven by the
       // backend job status updates rather than the local loop.
     } catch (error) {
