@@ -47,11 +47,11 @@ import {
   type BackendVirtualTrack,
   type VirtualMixerTrack,
 } from "../../lib/virtualTracks";
-import { requestAnalyzeMix } from "../../studio/audioEngine/trackProcessor";
+import { requestAnalyzeMix } from "../../audio-engine/analysisTrackProcessor";
 import {
   buildTrackPluginsFromAnalysis,
   mergeAiPluginsWithUserPlugins,
-} from "../../studio/audioEngine/pluginChain";
+} from "../../audio-engine/analysisPluginChain";
 
 export const dynamic = "force-dynamic";
 
